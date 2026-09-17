@@ -1,0 +1,90 @@
+# 콩스튜디오 채용 대시보드
+
+게임잡 공고와 Google Sheet의 지원자 진행 단계를 GitHub Pages에서 조회하는 읽기 전용 대시보드입니다.
+
+## 주요 기능
+
+- 게임잡에 등록된 콩스튜디오코리아 공고를 매시간 자동 확인
+- 등록일부터 7일 동안 공고 옆에 `NEW` 표시
+- 공고별 목표 TO, 채용 배경, 자유 메모를 현재 브라우저에 저장
+- 공고별로 9개 진행 단계의 지원자 확인
+- 대시보드에서는 Google Sheet를 수정하지 않음
+
+표시 단계: `온라인 과제`, `코딩테스트`, `역량검사`, `면접`, `1차 면접`, `2차 면접`, `면접합격`, `처우단계`, `Offer`
+
+`Hired`, 불합격, 포기, 취소 등은 카드에서 제외합니다. `Hired`는 충원 완료 인원 계산에만 사용합니다.
+
+## 데이터 흐름
+
+1. GitHub Actions가 매시간 게임잡의 콩스튜디오코리아 공고를 확인합니다.
+2. 신규·진행·마감 공고를 Google Sheet의 `채용대시보드_공고` 탭에 동기화합니다.
+3. Apps Script가 지원자 시트에서 필요한 열과 진행 단계만 반환합니다.
+4. GitHub Actions가 결과를 `dashboard.json`으로 만든 후 GitHub Pages에 배포합니다.
+5. 대시보드는 배포된 JSON을 읽기만 합니다.
+
+지원자 이름과 진행 단계는 배포 결과의 JSON에 포함됩니다. 로그인 없는 GitHub Pages를 사용하므로 사이트 주소를 아는 사람은 이 데이터를 볼 수 있습니다.
+
+## 1. 별도 GitHub 저장소 만들기
+
+1. GitHub에서 새 저장소를 만듭니다.
+2. 저장소 이름을 `kong-recruiting-dashboard`로 입력합니다.
+3. ZIP 내부의 모든 파일과 폴더를 저장소 최상단에 업로드합니다.
+4. 저장소 `Settings → Pages → Build and deployment`에서 Source를 `GitHub Actions`로 선택합니다.
+
+저장소를 Private으로 설정해도 배포된 GitHub Pages 사이트의 공개 여부와는 별개입니다.
+
+## 2. Google Apps Script 설치
+
+1. 지원자 관리 Google Sheet를 엽니다.
+2. `확장 프로그램 → Apps Script`를 선택합니다.
+3. 기본 코드를 지우고 `google-apps-script/Code.gs` 전체를 붙여넣습니다.
+4. `프로젝트 설정 → 스크립트 속성`에 아래 값을 등록합니다.
+   - 속성: `API_TOKEN`
+   - 값: 직접 만든 40자 이상의 임의 문자열
+5. `배포 → 새 배포 → 웹 앱`을 선택합니다.
+6. 실행 사용자는 `나`, 액세스 사용자는 `모든 사용자`로 설정합니다.
+7. 배포 후 `/exec`로 끝나는 웹 앱 URL을 복사합니다.
+
+Apps Script는 다음 탭을 사용합니다.
+
+- 지원자: `1. 2026 Interviewee`
+- 기존 TO 정보: `TO정리`
+- 게임잡 공고: `채용대시보드_공고` 자동 생성
+
+지원자 시트에서 필요한 헤더는 `진행단계`, `이름`, `직무(공고명)`입니다. `PJ` 열이 있으면 프로젝트명으로 사용합니다.
+
+## 3. GitHub Secret 등록
+
+저장소의 `Settings → Secrets and variables → Actions`에서 다음 Repository Secret 두 개를 등록합니다.
+
+- `SHEET_API_URL`: Apps Script의 `/exec` URL
+- `SHEET_API_TOKEN`: Apps Script에 등록한 `API_TOKEN` 값
+
+## 4. 최초 실행
+
+1. 저장소의 `Actions` 탭을 엽니다.
+2. `Sync recruiting data and deploy Pages`를 선택합니다.
+3. `Run workflow`를 실행합니다.
+4. 작업이 완료되면 `Settings → Pages`에 대시보드 주소가 표시됩니다.
+
+이후 매시간 7분에 자동으로 공고와 지원자 현황을 갱신합니다. 시트를 수정한 직후 바로 반영하려면 같은 workflow를 수동 실행합니다.
+
+## 브라우저 메모
+
+- `TO·메모 편집`에서 프로젝트, 목표 TO, 채용 배경, 메모를 입력합니다.
+- 내용은 브라우저의 로컬 저장소에만 저장됩니다.
+- Google Sheet나 GitHub에는 기록되지 않습니다.
+- 다른 PC·브라우저와 공유되지 않으며 브라우저 데이터를 지우면 삭제됩니다.
+
+## 기존 공개 사이트에 연결
+
+기존 `gpt-final` 저장소의 Actions 변수 `RECRUITING_DASHBOARD_URL`에 새 GitHub Pages 주소를 입력한 후 기존 사이트를 다시 배포합니다.
+
+## 로컬 확인
+
+```bash
+npm install
+npm run dev
+```
+
+로컬에서는 `public/data/dashboard.json`의 기본 빈 데이터를 표시합니다. 실제 데이터는 GitHub Actions 실행 과정에서 생성됩니다.

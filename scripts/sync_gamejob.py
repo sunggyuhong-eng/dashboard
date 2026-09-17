@@ -5,7 +5,8 @@ import os
 import re
 import sys
 import time
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -74,6 +75,40 @@ def collect() -> list[dict[str, str]]:
     return sorted(found.values(), key=lambda item: item["id"])
 
 
+def build_dashboard(jobs: list[dict[str, str]], sheet_data: dict) -> tuple[dict, int]:
+    candidates_by_title: dict[str, list[dict]] = defaultdict(list)
+    for candidate in sheet_data.get("candidates", []):
+        title = str(candidate.get("openingTitle") or "").strip()
+        if title:
+            candidates_by_title[title].append(candidate)
+    hired_counts = sheet_data.get("hiredCounts") if isinstance(sheet_data.get("hiredCounts"), dict) else {}
+
+    openings = []
+    current_titles = {job["title"].strip() for job in jobs}
+    for job in jobs:
+        title = job["title"].strip()
+        candidates = candidates_by_title.get(title, [])
+        project = next((str(item.get("project") or "").strip() for item in candidates if item.get("project")), "")
+        openings.append({
+            **job,
+            "source": "gamejob",
+            "status": "진행중",
+            "project": project,
+            "targetTo": 0,
+            "hiredCount": int(hired_counts.get(title, 0) or 0),
+            "reason": "",
+            "candidates": candidates,
+        })
+
+    dashboard = {
+        "openings": openings,
+        "candidateCount": sum(len(opening["candidates"]) for opening in openings),
+        "syncedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    unmatched = sum(len(items) for title, items in candidates_by_title.items() if title not in current_titles)
+    return dashboard, unmatched
+
+
 def main() -> int:
     jobs = collect()
     if not jobs:
@@ -84,21 +119,17 @@ def main() -> int:
     endpoint, token = os.getenv("SHEET_API_URL", ""), os.getenv("SHEET_API_TOKEN", "")
     if not endpoint or not token:
         raise RuntimeError("SHEET_API_URL 또는 SHEET_API_TOKEN Secret이 없습니다.")
-    response = httpx.post(endpoint, content=json.dumps({"action": "sync_gamejob", "token": token, "jobs": jobs}, ensure_ascii=False).encode(), headers={"Content-Type": "text/plain;charset=utf-8"}, timeout=60, follow_redirects=True)
+    response = httpx.post(endpoint, content=json.dumps({"action": "dashboard", "token": token}, ensure_ascii=False).encode(), headers={"Content-Type": "text/plain;charset=utf-8"}, timeout=60, follow_redirects=True)
     response.raise_for_status()
-    result = response.json()
-    if not result.get("ok"):
-        raise RuntimeError(result.get("error") or "시트 동기화에 실패했습니다.")
-    dashboard_response = httpx.post(endpoint, content=json.dumps({"action": "dashboard", "token": token}, ensure_ascii=False).encode(), headers={"Content-Type": "text/plain;charset=utf-8"}, timeout=60, follow_redirects=True)
-    dashboard_response.raise_for_status()
-    dashboard = dashboard_response.json()
-    if not dashboard.get("ok") or not isinstance(dashboard.get("openings"), list):
-        raise RuntimeError(dashboard.get("error") or "대시보드 데이터를 가져오지 못했습니다.")
-    dashboard.pop("ok", None)
+    sheet_data = response.json()
+    if not sheet_data.get("ok") or not isinstance(sheet_data.get("candidates"), list):
+        raise RuntimeError(sheet_data.get("error") or "지원자 데이터를 가져오지 못했습니다.")
+
+    dashboard, unmatched = build_dashboard(jobs, sheet_data)
     output = Path(__file__).resolve().parents[1] / "public" / "data" / "dashboard.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(dashboard, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"콩스튜디오코리아 공고 {len(jobs)}건 동기화 및 대시보드 데이터 생성 완료")
+    print(f"게임잡 공고 {len(jobs)}건과 진행 지원자 {dashboard['candidateCount']}명을 결합했습니다. 제목 불일치 지원자 {unmatched}명")
     return 0
 
 

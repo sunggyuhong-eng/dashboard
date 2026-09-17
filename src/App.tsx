@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, BriefcaseBusiness, Check, ChevronRight, Clock3, ExternalLink, FileText, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, ExternalLink, FileText, FolderKanban, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
@@ -14,8 +14,6 @@ type OpeningNote = {
 const NOTE_PREFIX = 'kong-recruiting-note:'
 const NEW_DAYS = 7
 const REPORT_ID = '__report__'
-const ASSESSMENT_STAGES: PipelineStage[] = ['온라인 과제', '코딩테스트', '역량검사']
-const OFFER_STAGES: PipelineStage[] = ['면접합격', '처우단계', 'Offer']
 
 function noteKey(openingId: string) { return `${NOTE_PREFIX}${openingId}` }
 function isArtOpening(title: string) { return /art|아트|애니메|컨셉|원화|모델|ui|ux|이펙트|vfx/i.test(title) }
@@ -47,6 +45,67 @@ function stagesFor(opening: Opening, note: OpeningNote) {
   return PIPELINE_STAGES.filter(stage => stages.has(stage))
 }
 
+function projectName(opening: Opening, note: OpeningNote) {
+  const saved = note.project.trim() || opening.project.trim()
+  if (saved) return saved.replace(/^Project\s+/i, '')
+  const bracket = opening.title.match(/^\[([^\]]+)\]/)?.[1]?.trim()
+  return bracket?.replace(/^Project\s+/i, '') || '프로젝트 미지정'
+}
+
+function roleName(opening: Opening, project: string) {
+  return opening.title
+    .replace(/^\[[^\]]+\]\s*/, '')
+    .replace(new RegExp(`^${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[-–|:]?\\s*`, 'i'), '')
+    .replace(/\s*모집\s*$/i, '')
+    .trim() || opening.title
+}
+
+function stageStatus(opening: Opening) {
+  if (!opening.candidates.length) return ['이력서 검토 중']
+  const labels: Record<PipelineStage, string> = {
+    '온라인 과제': '온라인 과제', '코딩테스트': '코딩 테스트', '역량검사': '역량 검사',
+    '면접': '면접 예정자', '1차 면접': '1차 면접', '2차 면접': '2차 면접',
+    '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼',
+  }
+  return PIPELINE_STAGES.flatMap(stage => {
+    const count = opening.candidates.filter(candidate => candidate.stage === stage).length
+    if (!count) return []
+    const suffix = stage === '면접' ? `${count}명` : `${count}명 진행 중`
+    return [`${labels[stage]} ${suffix}`]
+  })
+}
+
+function createSlackReport(openings: Opening[]) {
+  const notes = new Map(openings.map(opening => [opening.id, loadNote(opening)]))
+  const groups = new Map<string, Opening[]>()
+  openings.forEach(opening => {
+    const project = projectName(opening, notes.get(opening.id)!)
+    groups.set(project, [...(groups.get(project) || []), opening])
+  })
+  const targetTo = openings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0)
+  const candidateCount = openings.reduce((sum, opening) => sum + opening.candidates.length, 0)
+  const today = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())
+  const lines = [
+    `[채용 진행 현황 | ${today}]`,
+    `- 진행 프로젝트 ${groups.size}개 / 오픈 공고 ${openings.length}개 / 진행 지원자 ${candidateCount}명${targetTo ? ` / 목표 TO ${targetTo}명` : ''}`,
+    '',
+  ]
+  Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).forEach(([project, projectOpenings]) => {
+    lines.push(`- ${project}`)
+    projectOpenings.sort((a, b) => a.title.localeCompare(b.title, 'ko')).forEach(opening => {
+      const note = notes.get(opening.id)!
+      const to = note.targetTo ? ` (TO ${note.targetTo}명)` : ''
+      lines.push(`  - ${roleName(opening, project)}${to}`)
+      stageStatus(opening).forEach(status => lines.push(`    - ${status}`))
+      if (opening.candidates.length) {
+        if (note.reason.trim()) lines.push(`    - 채용 배경: ${note.reason.trim()}`)
+        note.memo.split('\n').map(line => line.trim()).filter(Boolean).forEach(line => lines.push(`    - ${line}`))
+      }
+    })
+  })
+  return lines.join('\n')
+}
+
 export default function App() { return <Dashboard /> }
 
 function Dashboard() {
@@ -75,20 +134,30 @@ function Dashboard() {
 }
 
 function OverviewReport({ data }: { data: DashboardData }) {
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportText, setReportText] = useState('')
+  const [copied, setCopied] = useState(false)
   const active = data.openings.filter(opening => opening.status === '진행중')
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
   const candidates = active.flatMap(opening => opening.candidates)
-  const stageCounts = PIPELINE_STAGES.map(stage => ({ stage, count: candidates.filter(candidate => candidate.stage === stage).length })).filter(item => item.count > 0)
-  const newCount = active.filter(opening => isNewOpening(opening.postedAt)).length
-  const assessmentCount = candidates.filter(candidate => ASSESSMENT_STAGES.includes(candidate.stage)).length
-  const interviewCount = candidates.filter(candidate => candidate.stage.includes('면접')).length
-  const offerCount = candidates.filter(candidate => OFFER_STAGES.includes(candidate.stage)).length
-  const maxStage = Math.max(1, ...stageCounts.map(item => item.count))
+  const targetTo = active.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0)
+  const projects = new Map<string, Opening[]>()
+  active.forEach(opening => {
+    const project = projectName(opening, notes.get(opening.id)!)
+    projects.set(project, [...(projects.get(project) || []), opening])
+  })
   const rows = [...active].sort((a, b) => Number(isNewOpening(b.postedAt)) - Number(isNewOpening(a.postedAt)) || b.candidates.length - a.candidates.length || a.title.localeCompare(b.title))
-  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1><p>오픈 공고와 지원자의 현재 전형 단계를 한 화면에서 확인합니다.</p></div><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div></div>
-    <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /><Summary icon={Target} label="과제·검사" value={`${assessmentCount}명`} /><Summary icon={Clock3} label="면접 진행" value={`${interviewCount}명`} /><Summary icon={Check} label="합격·처우" value={`${offerCount}명`} /></div>
-    <div className="report-panels"><article className="report-panel"><header><div><span>PIPELINE</span><h2>단계별 진행 인원</h2></div><small>현재 단계 기준</small></header><div className="stage-bars">{stageCounts.length ? stageCounts.map(item => <div className="stage-bar" key={item.stage}><span>{item.stage}</span><div><i style={{ width: `${Math.max(8, item.count / maxStage * 100)}%` }} /></div><b>{item.count}명</b></div>) : <p className="muted">진행 중인 지원자가 없습니다.</p>}</div></article><article className="report-panel signals"><header><div><span>SUMMARY</span><h2>이번 채용 현황</h2></div></header><div><p><b>{active.length}개</b><span>현재 오픈 공고</span></p><p><b>{newCount}개</b><span>최근 7일 신규 공고</span></p><p><b>{active.filter(opening => opening.candidates.length === 0).length}개</b><span>진행 지원자 없는 공고</span></p><p><b>{active.filter(opening => opening.candidates.length > 0).length}개</b><span>전형 진행 중 공고</span></p></div></article></div>
+  const openReport = () => { setReportText(createSlackReport(active)); setCopied(false); setReportOpen(true) }
+  const copyReport = async () => {
+    try { await navigator.clipboard.writeText(reportText) }
+    catch { const area = document.querySelector<HTMLTextAreaElement>('.report-textarea'); area?.select(); document.execCommand('copy') }
+    setCopied(true); window.setTimeout(() => setCopied(false), 2000)
+  }
+  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1><p>프로젝트별 오픈 직무와 현재 진행 상황을 한 화면에서 확인합니다.</p></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
+    <div className="report-kpis"><Summary icon={FolderKanban} label="진행 프로젝트" value={`${projects.size}개`} accent /><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /><Summary icon={Clock3} label="이력서 검토 공고" value={`${active.filter(opening => !opening.candidates.length).length}개`} /></div>
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>이번 채용 현황</h2></div><small>프로젝트 → 직무 → 현재 진행 순서로 확인</small></header><div className="project-grid">{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).map(([project, openings]) => { const projectCandidates = openings.reduce((sum, opening) => sum + opening.candidates.length, 0); const projectTo = openings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0); return <section className="project-card" key={project}><header><div><b>{project}</b><small>{openings.length}개 공고 · 진행 {projectCandidates}명{projectTo ? ` · TO ${projectTo}명` : ''}</small></div><span>{openings.some(opening => isNewOpening(opening.postedAt)) ? 'NEW' : 'OPEN'}</span></header><div>{[...openings].sort((a, b) => a.title.localeCompare(b.title, 'ko')).map(opening => <div className="project-role" key={opening.id}><div><b>{roleName(opening, project)}</b>{notes.get(opening.id)!.targetTo > 0 && <small>TO {notes.get(opening.id)!.targetTo}명</small>}</div><ul>{stageStatus(opening).map(status => <li key={status}>{status}</li>)}</ul></div>)}</div></section> })}</div></article>
     <article className="opening-report"><header><div><span>OPEN POSITIONS</span><h2>오픈 공고별 진행 현황</h2></div><small>TO와 채용 배경은 이 브라우저에 저장된 메모 기준</small></header><div className="report-table"><div className="report-row report-header"><span>공고</span><span>TO 현황</span><span>진행 인원</span><span>현재 전형</span><span>채용 배경</span></div>{rows.map(opening => { const note = notes.get(opening.id)!; const remaining = Math.max(0, note.targetTo - opening.hiredCount); const counts = PIPELINE_STAGES.map(stage => ({ stage, count: opening.candidates.filter(candidate => candidate.stage === stage).length })).filter(item => item.count > 0); return <div className="report-row" key={opening.id}><span><b>{opening.title}{isNewOpening(opening.postedAt) && <em className="new-badge">NEW</em>}</b><small>{note.project || opening.project || '프로젝트 미지정'}</small></span><span><b>{note.targetTo ? `${opening.hiredCount}/${note.targetTo}명` : '미입력'}</b><small>{note.targetTo ? `잔여 ${remaining}명` : 'TO 메모 필요'}</small></span><span><b>{opening.candidates.length}명</b></span><span className="stage-chips">{counts.length ? counts.map(item => <i key={item.stage}>{item.stage} {item.count}</i>) : <small>진행 지원자 없음</small>}</span><span className="reason-cell">{note.reason || note.memo || <small>메모 없음</small>}</span></div> })}</div></article>
+    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 보고 문구</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><p className="local-help">현재 화면의 공고·지원자 현황과 이 브라우저의 TO·채용 배경·메모를 반영했습니다. 복사 전에 자유롭게 수정할 수 있습니다.</p><textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /><div className="modal-actions"><span className="copy-status">{copied ? '복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
   </section>
 }
 

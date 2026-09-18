@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, BriefcaseBusiness, Check, ChevronDown, ChevronRight, ClipboardCopy, Clock3, ExternalLink, FileText, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, ExternalLink, FileText, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
@@ -47,9 +47,13 @@ function stagesFor(opening: Opening, note: OpeningNote) {
 
 function projectName(opening: Opening, note: OpeningNote) {
   const saved = note.project.trim() || opening.project.trim()
-  if (saved) return saved.replace(/^Project\s+/i, '')
+  if (saved) {
+    const normalized = saved.replace(/^Project\s+/i, '').trim()
+    return /^(octopus|otps)$/i.test(normalized) ? 'OTPS' : normalized
+  }
   const bracket = opening.title.match(/^\[([^\]]+)\]/)?.[1]?.trim()
-  return bracket?.replace(/^Project\s+/i, '') || '프로젝트 미지정'
+  const normalized = bracket?.replace(/^Project\s+/i, '').trim()
+  return normalized && /^(octopus|otps)$/i.test(normalized) ? 'OTPS' : normalized || '프로젝트 미지정'
 }
 
 function roleName(opening: Opening, project: string) {
@@ -134,7 +138,7 @@ function Dashboard() {
   const openings = useMemo(() => (data?.openings || []).filter(x => (includeClosed || x.status === '진행중') && `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query, includeClosed])
   const selected = data?.openings.find(x => x.id === selectedId) || null
   return <div className="shell"><header className="topbar"><div><div className="brand-mark">KS</div><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></div><nav><button onClick={load} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''} /> 새로고침</button></nav></header>
-    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><h2>채용 현황</h2></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={() => setSelectedId(REPORT_ID)}><BarChart3 size={17} /><div><b>전체 채용 리포트</b><small>오픈 공고와 전형 진행 요약</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><label className="closed-toggle"><input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} /> 마감 공고 포함</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className={`status-dot ${opening.status === '마감' ? 'closed' : ''}`} /><div><b>{opening.title}{isNewOpening(opening.postedAt) && <em className="new-badge">NEW</em>}</b><small>{opening.project || '프로젝트 미지정'} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
+    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><h2>채용 현황</h2></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={() => setSelectedId(REPORT_ID)}><BarChart3 size={17} /><div><b>전체 채용 리포트</b><small>오픈 공고와 전형 진행 요약</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><label className="closed-toggle"><input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} /> 마감 공고 포함</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className={`status-dot ${opening.status === '마감' ? 'closed' : ''}`} /><div><b>{opening.title}{isNewOpening(opening.postedAt) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening, loadNote(opening))} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
       <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
   </div>
@@ -153,16 +157,6 @@ function OverviewReport({ data }: { data: DashboardData }) {
     const project = projectName(opening, notes.get(opening.id)!)
     projects.set(project, [...(projects.get(project) || []), opening])
   })
-  const issues = active.flatMap(opening => {
-    const note = notes.get(opening.id)!
-    const project = projectName(opening, note)
-    const messages = []
-    if (!opening.candidates.length) messages.push('진행 지원자 없음 · 이력서 검토 필요')
-    if (!note.targetTo) messages.push('목표 TO 미입력')
-    if (project === '프로젝트 미지정') messages.push('프로젝트 미지정')
-    return messages.length ? [{ opening, project, message: messages.join(' / ') }] : []
-  })
-  const rows = [...active].sort((a, b) => Number(isNewOpening(b.postedAt)) - Number(isNewOpening(a.postedAt)) || b.candidates.length - a.candidates.length || a.title.localeCompare(b.title))
   const openReport = () => { setReportText(createSlackReport(active)); setCopied(false); setReportOpen(true) }
   const copyReport = async () => {
     try { await navigator.clipboard.writeText(reportText) }
@@ -170,10 +164,8 @@ function OverviewReport({ data }: { data: DashboardData }) {
     setCopied(true); window.setTimeout(() => setCopied(false), 2000)
   }
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1><p>프로젝트별 오픈 직무와 현재 진행 상황을 한 화면에서 확인합니다.</p></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
-    <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} accent /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
-    {issues.length > 0 && <article className="attention-panel"><header><div><AlertTriangle size={17} /><span><b>확인 필요</b><small>지금 점검해야 할 공고 {issues.length}개</small></span></div></header><div>{issues.map(({ opening, project, message }) => <div className="attention-row" key={opening.id}><span><b>{project}</b><small>{roleName(opening, project)}</small></span><strong>{message}</strong></div>)}</div></article>}
+    <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
     <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>이번 채용 현황</h2></div><small>프로젝트별 TO와 핵심 진행 상황</small></header><div className="project-summary-table"><div className="project-summary-row project-summary-head"><span>프로젝트</span><span>오픈 공고</span><span>목표 TO</span><span>진행 지원자</span><span>현재 핵심 상황</span></div>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).map(([project, openings]) => { const projectCandidates = openings.reduce((sum, opening) => sum + opening.candidates.length, 0); const projectTo = openings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0); return <div className="project-summary-row" key={project}><span className="project-name"><b>{project}</b>{openings.some(opening => isNewOpening(opening.postedAt)) && <em className="new-badge">NEW</em>}</span><span><b>{openings.length}</b>개</span><span><b>{projectTo || '-'}</b>{projectTo ? '명' : ''}</span><span><b>{projectCandidates}</b>명</span><span className="key-situation">{[...openings].sort((a, b) => a.title.localeCompare(b.title, 'ko')).map(opening => <strong key={opening.id}><i>{roleName(opening, project)}</i>{openingSituation(opening, notes.get(opening.id)!)}</strong>)}</span></div> })}</div></article>
-    <details className="opening-details"><summary><span><b>공고 상세 펼쳐보기</b><small>TO·전형 단계·채용 배경 전체 확인</small></span><ChevronDown size={18} /></summary><article className="opening-report"><header><div><span>OPEN POSITIONS</span><h2>오픈 공고별 진행 현황</h2></div><small>TO와 채용 배경은 이 브라우저에 저장된 메모 기준</small></header><div className="report-table"><div className="report-row report-header"><span>공고</span><span>TO 현황</span><span>진행 인원</span><span>현재 전형</span><span>채용 배경</span></div>{rows.map(opening => { const note = notes.get(opening.id)!; const remaining = Math.max(0, note.targetTo - opening.hiredCount); const counts = PIPELINE_STAGES.map(stage => ({ stage, count: opening.candidates.filter(candidate => candidate.stage === stage).length })).filter(item => item.count > 0); return <div className="report-row" key={opening.id}><span><b>{opening.title}{isNewOpening(opening.postedAt) && <em className="new-badge">NEW</em>}</b><small>{note.project || opening.project || '프로젝트 미지정'}</small></span><span><b>{note.targetTo ? `${opening.hiredCount}/${note.targetTo}명` : '미입력'}</b><small>{note.targetTo ? `잔여 ${remaining}명` : 'TO 메모 필요'}</small></span><span><b>{opening.candidates.length}명</b></span><span className="stage-chips">{counts.length ? counts.map(item => <i key={item.stage}>{item.stage} {item.count}</i>) : <small>진행 지원자 없음</small>}</span><span className="reason-cell">{note.reason || note.memo || <small>메모 없음</small>}</span></div> })}</div></article></details>
     {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 보고 문구</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><p className="local-help">현재 화면의 공고·지원자 현황과 이 브라우저의 TO·채용 배경·메모를 반영했습니다. 복사 전에 자유롭게 수정할 수 있습니다.</p><textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /><div className="modal-actions"><span className="copy-status">{copied ? '복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
   </section>
 }

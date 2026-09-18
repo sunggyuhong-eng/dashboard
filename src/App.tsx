@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, ExternalLink, FileText, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, ExternalLink, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
@@ -14,6 +14,8 @@ type OpeningNote = {
 const NOTE_PREFIX = 'kong-recruiting-note:'
 const NEW_DAYS = 7
 const REPORT_ID = '__report__'
+const AUTH_KEY = 'kong-recruiting-authenticated'
+const PASSWORD_HASH = '5acc4f34e4cc64ca45390a50c9f84d960b49639390b75fc5eb46b542a90dac66'
 
 function noteKey(openingId: string) { return `${NOTE_PREFIX}${openingId}` }
 function isArtOpening(title: string) { return /art|아트|애니메|컨셉|원화|모델|ui|ux|이펙트|vfx/i.test(title) }
@@ -86,13 +88,6 @@ function openingSituation(opening: Opening, note: OpeningNote) {
   return memo ? `${status} · ${memo}` : status
 }
 
-function progressBar(completed: number, target: number) {
-  if (!target) return ''
-  const ratio = Math.min(1, Math.max(0, completed / target))
-  const filled = Math.round(ratio * 10)
-  return `\`${'█'.repeat(filled)}${'░'.repeat(10 - filled)}\` ${Math.round(ratio * 100)}% (${completed}/${target}명)`
-}
-
 function createSlackReport(openings: Opening[]) {
   const notes = new Map(openings.map(opening => [opening.id, loadNote(opening)]))
   const groups = new Map<string, Opening[]>()
@@ -110,29 +105,62 @@ function createSlackReport(openings: Opening[]) {
     '',
   ]
   Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).forEach(([project, projectOpenings]) => {
-    const projectTo = projectOpenings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0)
-    const projectHired = projectOpenings.reduce((sum, opening) => sum + opening.hiredCount, 0)
-    const projectCandidates = projectOpenings.reduce((sum, opening) => sum + opening.candidates.length, 0)
-    lines.push(`*${project}*  |  공고 ${projectOpenings.length}개 · TO ${projectTo ? `${projectTo}명` : '미입력'} · 진행 ${projectCandidates}명`)
-    if (projectTo) lines.push(`충원 ${progressBar(projectHired, projectTo)}`)
+    lines.push(`*${project}*`)
     projectOpenings.sort((a, b) => a.title.localeCompare(b.title, 'ko')).forEach(opening => {
       const note = notes.get(opening.id)!
-      const to = note.targetTo ? ` · TO ${note.targetTo}명` : ''
-      lines.push(`• *${roleName(opening, project)}*${to}`)
-      lines.push(`  ↳ ${stageStatus(opening).join(' · ')}`)
-      if (opening.candidates.length) {
-        if (note.reason.trim()) lines.push(`  ↳ 채용 배경: ${note.reason.trim()}`)
-        note.memo.split('\n').map(line => line.trim()).filter(Boolean).forEach(line => lines.push(`  ↳ ${line}`))
-      }
+      lines.push(`• *${roleName(opening, project)}*`)
+      lines.push(`  ◦ 채용 배경: ${note.reason.trim() || '미입력'}`)
+      lines.push(`  ◦ TO: ${note.targetTo ? `${note.targetTo}명` : '미입력'}`)
+      lines.push(`  ◦ 현재 진행: ${openingSituation(opening, note)}`)
     })
     lines.push('')
   })
   return lines.join('\n').trim()
 }
 
-export default function App() { return <Dashboard /> }
+async function sha256(value: string) {
+  const bytes = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
 
-function Dashboard() {
+function isAuthenticated() {
+  try { return sessionStorage.getItem(AUTH_KEY) === 'true' }
+  catch { return false }
+}
+
+export default function App() {
+  const [authenticated, setAuthenticated] = useState(isAuthenticated)
+  const unlock = () => {
+    try { sessionStorage.setItem(AUTH_KEY, 'true') } catch { /* 세션 저장이 막혀도 현재 화면은 허용 */ }
+    setAuthenticated(true)
+  }
+  const logout = () => {
+    try { sessionStorage.removeItem(AUTH_KEY) } catch { /* ignore */ }
+    setAuthenticated(false)
+  }
+  return authenticated ? <Dashboard onLogout={logout} /> : <LoginScreen onSuccess={unlock} />
+}
+
+function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
+  const [checking, setChecking] = useState(false)
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!password) { setError('비밀번호를 입력해 주세요.'); return }
+    setChecking(true); setError('')
+    try {
+      if (await sha256(password) === PASSWORD_HASH) onSuccess()
+      else { setError('비밀번호가 올바르지 않습니다.'); setPassword('') }
+    } catch { setError('비밀번호를 확인하지 못했습니다. 다시 시도해 주세요.') }
+    finally { setChecking(false) }
+  }
+  return <main className="login-shell"><section className="login-card"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.svg`} alt="KONG STUDIOS" /><span className="login-eyebrow">KONG STUDIOS KOREA</span><h1>채용 대시보드</h1><p>내부 채용 현황을 확인하려면 비밀번호를 입력해 주세요.</p><form onSubmit={submit}><label>비밀번호<div className={`password-field ${error ? 'invalid' : ''}`}><LockKeyhole size={18} /><input autoFocus autoComplete="current-password" type={showPassword ? 'text' : 'password'} value={password} onChange={event => { setPassword(event.target.value); setError('') }} placeholder="비밀번호 입력" /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>{error && <div className="login-error">{error}</div>}<button className="login-submit" type="submit" disabled={checking}>{checking ? '확인 중...' : '대시보드 들어가기'}</button></form><small>브라우저 탭을 닫으면 다시 로그인이 필요합니다.</small></section></main>
+}
+
+function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -158,7 +186,7 @@ function Dashboard() {
   const openings = useMemo(() => (data?.openings || []).filter(x => (includeClosed || x.status === '진행중') && `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query, includeClosed])
   const selected = data?.openings.find(x => x.id === selectedId) || null
   const goHome = () => setSelectedId(REPORT_ID)
-  return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.svg`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button onClick={() => void load(true)} disabled={loading} title="현재 배포된 데이터를 캐시 없이 다시 불러옵니다"><RefreshCw size={16} className={loading ? 'spin' : ''} /> {loading ? '불러오는 중' : '데이터 다시 불러오기'}</button></nav></header>
+  return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.svg`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button onClick={() => void load(true)} disabled={loading} title="현재 배포된 데이터를 캐시 없이 다시 불러옵니다"><RefreshCw size={16} className={loading ? 'spin' : ''} /> {loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
     <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b><small>오픈 공고와 전형 진행 요약</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><label className="closed-toggle"><input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} /> 마감 공고 포함</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className={`status-dot ${opening.status === '마감' ? 'closed' : ''}`} /><div><b>{opening.title}{isNewOpening(opening.postedAt) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening, loadNote(opening))} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
       <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
@@ -187,8 +215,8 @@ function OverviewReport({ data }: { data: DashboardData }) {
   }
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1><p>프로젝트별 오픈 직무와 현재 진행 상황을 한 화면에서 확인합니다.</p></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div><small>프로젝트별 TO와 핵심 진행 상황</small></header><div className="project-summary-table"><div className="project-summary-row project-summary-head"><span>프로젝트</span><span>오픈 공고</span><span>목표 TO</span><span>채용 배경</span><span>진행 지원자</span><span>현재 핵심 상황</span></div>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).map(([project, openings]) => { const projectCandidates = openings.reduce((sum, opening) => sum + opening.candidates.length, 0); const projectTo = openings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0); const reasons = [...new Set(openings.map(opening => notes.get(opening.id)!.reason.trim()).filter(Boolean))]; return <div className="project-summary-row" key={project}><span className="project-name"><b>{project}</b>{openings.some(opening => isNewOpening(opening.postedAt)) && <em className="new-badge">NEW</em>}</span><span><b>{openings.length}</b>개</span><span><b>{projectTo || '-'}</b>{projectTo ? '명' : ''}</span><span className="project-reason">{reasons.length ? reasons.map(reason => <small key={reason}>{reason}</small>) : <small>미입력</small>}</span><span><b>{projectCandidates}</b>명</span><span className="key-situation">{[...openings].sort((a, b) => a.title.localeCompare(b.title, 'ko')).map(opening => <strong key={opening.id}><i>{roleName(opening, project)}</i>{openingSituation(opening, notes.get(opening.id)!)}</strong>)}</span></div> })}</div></article>
-    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 보고 문구</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>굵은 제목, 검은 불릿, 프로젝트별 충원 막대가 유지됩니다. 문구는 아래에서 직접 수정할 수 있습니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 문구를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div><small>공고별 채용 배경·TO·진행 상황을 연결해 표시합니다</small></header><div className="project-summary-table"><div className="project-summary-row project-summary-head"><span>프로젝트</span><span>오픈 공고</span><span>목표 TO</span><span>진행 지원자</span><span>공고별 채용 현황</span></div>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).map(([project, openings]) => { const projectCandidates = openings.reduce((sum, opening) => sum + opening.candidates.length, 0); const projectTo = openings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0); return <div className="project-summary-row" key={project}><span className="project-name"><b>{project}</b>{openings.some(opening => isNewOpening(opening.postedAt)) && <em className="new-badge">NEW</em>}</span><span><b>{openings.length}</b>개</span><span><b>{projectTo || '-'}</b>{projectTo ? '명' : ''}</span><span><b>{projectCandidates}</b>명</span><div className="opening-match-list">{[...openings].sort((a, b) => a.title.localeCompare(b.title, 'ko')).map(opening => { const note = notes.get(opening.id)!; return <div className="opening-match-row" key={opening.id}><span className="matched-role"><small>채용 직무</small><b>{roleName(opening, project)}</b></span><span className="matched-plan"><small>채용 배경 · TO</small><b>{note.reason.trim() || '채용 배경 미입력'}</b><em>{note.targetTo ? `TO ${note.targetTo}명` : 'TO 미입력'}</em></span><span className="matched-progress"><small>현재 진행</small><b>{openingSituation(opening, note)}</b></span></div> })}</div></div> })}</div></article>
+    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 보고 문구</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>프로젝트 아래에 채용 직무, 채용 배경·TO, 현재 진행 순서로 정리됩니다. 문구는 아래에서 직접 수정할 수 있습니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 문구를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
   </section>
 }
 

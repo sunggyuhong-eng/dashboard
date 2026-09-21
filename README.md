@@ -1,5 +1,7 @@
 # 콩스튜디오 채용 대시보드
 
+> 이 저장소는 대시보드 전용 소스만 빌드합니다. 이전에 `gpt-final` 파일을 함께 업로드했다면 `src/analysis.ts`, `src/analysis.test.ts`, `src/data.ts`, `src/pagination.ts`, `src/pagination.test.ts`를 삭제하세요. 최신 빌드 설정은 남아 있는 미사용 파일을 컴파일 대상에서 제외합니다.
+
 원본과 `IMPORTRANGE`로 연결된 대시보드 전용 사본에서 TO와 지원자 진행 단계를 읽어 GitHub Pages에 표시하는 읽기 전용 대시보드입니다.
 
 ## 주요 기능

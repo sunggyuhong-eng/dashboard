@@ -47,3 +47,23 @@ def test_build_dashboard_keeps_opening_without_active_candidates():
     assert dashboard["openings"][0]["candidates"] == []
     assert dashboard["candidateCount"] == 0
     assert unmatched == 0
+
+
+def test_new_badge_only_marks_openings_added_since_previous_sync():
+    existing_id = opening_id("MAZE", "Dev PM")
+    sheet_data = {
+        "openings": [
+            {"project": "MAZE", "title": "Dev PM", "targetTo": 1, "reason": "증원"},
+            {"project": "ZERO", "title": "Client Engineer", "targetTo": 1, "reason": "신규"},
+        ],
+        "candidates": [],
+        "hiredCounts": {},
+    }
+
+    dashboard, _ = build_dashboard(sheet_data, {existing_id})
+
+    flags = {item["title"]: item["isNew"] for item in dashboard["openings"]}
+    assert flags == {"Dev PM": False, "Client Engineer": True}
+
+    next_dashboard, _ = build_dashboard(sheet_data, {item["id"] for item in dashboard["openings"]})
+    assert all(item["isNew"] is False for item in next_dashboard["openings"])

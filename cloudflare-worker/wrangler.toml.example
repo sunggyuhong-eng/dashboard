@@ -1,0 +1,9 @@
+name = "kong-dashboard-refresh"
+main = "worker.js"
+compatibility_date = "2026-09-21"
+
+[vars]
+ALLOWED_ORIGIN = "https://sunggyuhong-eng.github.io"
+GITHUB_OWNER = "sunggyuhong-eng"
+GITHUB_REPOSITORY = "dashboard"
+GITHUB_WORKFLOW = "sync-and-deploy.yml"

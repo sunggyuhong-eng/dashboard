@@ -9,11 +9,11 @@ type OpeningNote = {
 }
 
 const NOTE_PREFIX = 'kong-recruiting-note:'
-const FIRST_SEEN_PREFIX = 'kong-recruiting-first-seen:'
-const NEW_DAYS = 7
 const REPORT_ID = '__report__'
 const AUTH_KEY = 'kong-recruiting-authenticated'
 const PASSWORD_HASH = '5acc4f34e4cc64ca45390a50c9f84d960b49639390b75fc5eb46b542a90dac66'
+const SYNC_POLL_INTERVAL_MS = 8_000
+const SYNC_POLL_LIMIT = 38
 
 function noteKey(openingId: string) { return `${NOTE_PREFIX}${openingId}` }
 function isArtOpening(title: string) { return /art|아트|애니메|컨셉|원화|모델|ui|ux|이펙트|vfx/i.test(title) }
@@ -37,22 +37,7 @@ function loadNote(opening: Opening): OpeningNote {
     }
   } catch { return fallback }
 }
-function isNewOpening(opening: Opening) {
-  let postedAt = opening.postedAt
-  if (!postedAt) {
-    try {
-      const key = `${FIRST_SEEN_PREFIX}${opening.id}`
-      postedAt = localStorage.getItem(key) || ''
-      if (!postedAt) {
-        postedAt = new Date().toISOString().slice(0, 10)
-        localStorage.setItem(key, postedAt)
-      }
-    } catch { return false }
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(postedAt)) return false
-  const age = Date.now() - new Date(`${postedAt}T00:00:00+09:00`).getTime()
-  return age >= 0 && age < NEW_DAYS * 24 * 60 * 60 * 1000
-}
+function isNewOpening(opening: Opening) { return opening.isNew === true }
 function stagesFor(opening: Opening, note: OpeningNote) {
   const stages = new Set(note.enabledStages)
   opening.candidates.forEach(candidate => stages.add(candidate.stage))
@@ -176,6 +161,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [selectedId, setSelectedId] = useState(REPORT_ID)
   const [query, setQuery] = useState('')
   const [refreshNotice, setRefreshNotice] = useState('')
@@ -193,11 +179,37 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     } catch (e) { setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.') }
     finally { setLoading(false) }
   }
+  const syncNow = async () => {
+    if (syncing) return
+    const previousSyncedAt = data?.syncedAt || ''
+    setSyncing(true); setError(''); setRefreshNotice('GitHub Actions 실행을 요청하고 있어요.')
+    try {
+      await api.requestSync()
+      setRefreshNotice('시트 데이터를 동기화하고 배포하는 중이에요. 완료되면 자동으로 반영됩니다.')
+      for (let attempt = 0; attempt < SYNC_POLL_LIMIT; attempt += 1) {
+        await new Promise(resolve => window.setTimeout(resolve, SYNC_POLL_INTERVAL_MS))
+        const next = await api.dashboard()
+        if (next.syncedAt && next.syncedAt !== previousSyncedAt) {
+          setData(next)
+          setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
+          setRefreshNotice('최신 시트 데이터가 대시보드에 반영됐어요.')
+          window.setTimeout(() => setRefreshNotice(''), 4000)
+          return
+        }
+      }
+      throw new Error('배포 완료를 기다리는 시간이 길어지고 있습니다. 잠시 후 다시 눌러 확인해 주세요.')
+    } catch (e) {
+      setRefreshNotice(e instanceof Error ? e.message : '데이터 동기화를 시작하지 못했습니다.')
+      window.setTimeout(() => setRefreshNotice(''), 6500)
+    } finally {
+      setSyncing(false)
+    }
+  }
   useEffect(() => { void load(false) }, [])
   const openings = useMemo(() => (data?.openings || []).filter(x => `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query])
   const selected = data?.openings.find(x => x.id === selectedId) || null
   const goHome = () => setSelectedId(REPORT_ID)
-  return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button onClick={() => void load(true)} disabled={loading} title="현재 배포된 데이터를 캐시 없이 다시 불러옵니다"><RefreshCw size={16} className={loading ? 'spin' : ''} /> {loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
+  return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="GitHub Actions를 실행하고 새 시트 데이터가 배포되면 자동으로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '동기화·배포 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
     <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
       <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}

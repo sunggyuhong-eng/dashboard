@@ -23,7 +23,7 @@ def opening_id(project: object, title: object) -> str:
     return f"sheet-{digest}"
 
 
-def build_dashboard(sheet_data: dict) -> tuple[dict, int]:
+def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = None) -> tuple[dict, int]:
     candidates_by_opening: dict[str, list[dict]] = defaultdict(list)
     for candidate in sheet_data.get("candidates", []):
         key = opening_key(candidate.get("project"), candidate.get("openingTitle"))
@@ -54,6 +54,7 @@ def build_dashboard(sheet_data: dict) -> tuple[dict, int]:
             "postedAt": "",
             "deadline": "",
             "source": "sheet",
+            "isNew": previous_opening_ids is not None and item_id not in previous_opening_ids,
             "status": "진행중",
             "project": project,
             "targetTo": max(0, int(float(source.get("targetTo") or 0))),
@@ -70,6 +71,20 @@ def build_dashboard(sheet_data: dict) -> tuple[dict, int]:
     }
     unmatched = sum(len(items) for key, items in candidates_by_opening.items() if key not in current_keys)
     return dashboard, unmatched
+
+
+def load_previous_opening_ids() -> set[str] | None:
+    path = os.getenv("PREVIOUS_DASHBOARD_PATH", "").strip()
+    if not path:
+        return None
+    try:
+        previous = json.loads(Path(path).read_text(encoding="utf-8"))
+        openings = previous.get("openings") if isinstance(previous, dict) else None
+        if not isinstance(openings, list):
+            return None
+        return {str(item.get("id")) for item in openings if isinstance(item, dict) and item.get("id")}
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def main() -> int:
@@ -93,7 +108,7 @@ def main() -> int:
     ):
         raise RuntimeError(sheet_data.get("error") or "연동용 사본의 공고 또는 지원자 데이터를 가져오지 못했습니다.")
 
-    dashboard, unmatched = build_dashboard(sheet_data)
+    dashboard, unmatched = build_dashboard(sheet_data, load_previous_opening_ids())
     if not dashboard["openings"]:
         raise RuntimeError("Dashboard_TO 탭에 표시할 공고가 없어 기존 배포 상태를 유지합니다.")
 

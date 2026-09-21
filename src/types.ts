@@ -25,7 +25,7 @@ export type Opening = {
   targetTo: number
   hiredCount: number
   reason: string
-  source: 'gamejob' | 'sheet'
+  source: 'sheet'
   candidates: Candidate[]
 }
 

@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, ExternalLink, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
 type OpeningNote = {
-  targetTo: number
-  reason: string
-  project: string
   memo: string
   enabledStages: PipelineStage[]
 }
 
 const NOTE_PREFIX = 'kong-recruiting-note:'
+const FIRST_SEEN_PREFIX = 'kong-recruiting-first-seen:'
 const NEW_DAYS = 7
 const REPORT_ID = '__report__'
 const AUTH_KEY = 'kong-recruiting-authenticated'
@@ -28,15 +26,29 @@ function recommendedStages(opening: Opening): PipelineStage[] {
   return PIPELINE_STAGES.filter(stage => active.has(stage))
 }
 function loadNote(opening: Opening): OpeningNote {
-  const fallback: OpeningNote = { targetTo: 0, reason: '', project: opening.project, memo: '', enabledStages: recommendedStages(opening) }
+  const fallback: OpeningNote = { memo: '', enabledStages: recommendedStages(opening) }
   try {
     const saved = localStorage.getItem(noteKey(opening.id))
     if (!saved) return fallback
     const parsed = JSON.parse(saved) as Partial<OpeningNote>
-    return { ...fallback, ...parsed, enabledStages: Array.isArray(parsed.enabledStages) ? parsed.enabledStages.filter(stage => PIPELINE_STAGES.includes(stage)) : fallback.enabledStages }
+    return {
+      memo: typeof parsed.memo === 'string' ? parsed.memo : '',
+      enabledStages: Array.isArray(parsed.enabledStages) ? parsed.enabledStages.filter(stage => PIPELINE_STAGES.includes(stage)) : fallback.enabledStages,
+    }
   } catch { return fallback }
 }
-function isNewOpening(postedAt: string) {
+function isNewOpening(opening: Opening) {
+  let postedAt = opening.postedAt
+  if (!postedAt) {
+    try {
+      const key = `${FIRST_SEEN_PREFIX}${opening.id}`
+      postedAt = localStorage.getItem(key) || ''
+      if (!postedAt) {
+        postedAt = new Date().toISOString().slice(0, 10)
+        localStorage.setItem(key, postedAt)
+      }
+    } catch { return false }
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(postedAt)) return false
   const age = Date.now() - new Date(`${postedAt}T00:00:00+09:00`).getTime()
   return age >= 0 && age < NEW_DAYS * 24 * 60 * 60 * 1000
@@ -47,8 +59,8 @@ function stagesFor(opening: Opening, note: OpeningNote) {
   return PIPELINE_STAGES.filter(stage => stages.has(stage))
 }
 
-function projectName(opening: Opening, note: OpeningNote) {
-  const saved = note.project.trim() || opening.project.trim()
+function projectName(opening: Opening) {
+  const saved = opening.project.trim()
   if (saved) {
     const normalized = saved.replace(/^Project\s+/i, '').trim()
     return /^(octopus|otps)$/i.test(normalized) ? 'OTPS' : normalized
@@ -92,10 +104,10 @@ function createSlackReport(openings: Opening[]) {
   const notes = new Map(openings.map(opening => [opening.id, loadNote(opening)]))
   const groups = new Map<string, Opening[]>()
   openings.forEach(opening => {
-    const project = projectName(opening, notes.get(opening.id)!)
+    const project = projectName(opening)
     groups.set(project, [...(groups.get(project) || []), opening])
   })
-  const targetTo = openings.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0)
+  const targetTo = openings.reduce((sum, opening) => sum + opening.targetTo, 0)
   const candidateCount = openings.reduce((sum, opening) => sum + opening.candidates.length, 0)
   const today = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())
   const lines = [
@@ -109,8 +121,8 @@ function createSlackReport(openings: Opening[]) {
     projectOpenings.sort((a, b) => a.title.localeCompare(b.title, 'ko')).forEach(opening => {
       const note = notes.get(opening.id)!
       lines.push(`• *${roleName(opening, project)}*`)
-      lines.push(`  ◦ 채용 배경: ${note.reason.trim() || '미입력'}`)
-      lines.push(`  ◦ TO: ${note.targetTo ? `${note.targetTo}명` : '미입력'}`)
+      lines.push(`  ◦ 채용 배경: ${opening.reason.trim() || '미입력'}`)
+      lines.push(`  ◦ TO: ${opening.targetTo ? `${opening.targetTo}명` : '미입력'}`)
       lines.push(`  ◦ 현재 진행: ${openingSituation(opening, note)}`)
     })
     lines.push('')
@@ -166,7 +178,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(REPORT_ID)
   const [query, setQuery] = useState('')
-  const [includeClosed, setIncludeClosed] = useState(false)
   const [refreshNotice, setRefreshNotice] = useState('')
   const load = async (manual = false) => {
     setLoading(true); setError('')
@@ -183,11 +194,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     finally { setLoading(false) }
   }
   useEffect(() => { void load(false) }, [])
-  const openings = useMemo(() => (data?.openings || []).filter(x => (includeClosed || x.status === '진행중') && `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query, includeClosed])
+  const openings = useMemo(() => (data?.openings || []).filter(x => `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query])
   const selected = data?.openings.find(x => x.id === selectedId) || null
   const goHome = () => setSelectedId(REPORT_ID)
   return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button onClick={() => void load(true)} disabled={loading} title="현재 배포된 데이터를 캐시 없이 다시 불러옵니다"><RefreshCw size={16} className={loading ? 'spin' : ''} /> {loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
-    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b><small>오픈 공고와 전형 진행 요약</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><label className="closed-toggle"><input type="checkbox" checked={includeClosed} onChange={e => setIncludeClosed(e.target.checked)} /> 마감 공고 포함</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className={`status-dot ${opening.status === '마감' ? 'closed' : ''}`} /><div><b>{opening.title}{isNewOpening(opening.postedAt) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening, loadNote(opening))} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
+    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
       <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
@@ -201,10 +212,10 @@ function OverviewReport({ data }: { data: DashboardData }) {
   const active = data.openings.filter(opening => opening.status === '진행중')
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
   const candidates = active.flatMap(opening => opening.candidates)
-  const targetTo = active.reduce((sum, opening) => sum + notes.get(opening.id)!.targetTo, 0)
+  const targetTo = active.reduce((sum, opening) => sum + opening.targetTo, 0)
   const projects = new Map<string, Opening[]>()
   active.forEach(opening => {
-    const project = projectName(opening, notes.get(opening.id)!)
+    const project = projectName(opening)
     projects.set(project, [...(projects.get(project) || []), opening])
   })
   const openReport = () => { setReportText(createSlackReport(active)); setCopied(false); setReportOpen(true) }
@@ -213,9 +224,9 @@ function OverviewReport({ data }: { data: DashboardData }) {
     catch { const area = document.querySelector<HTMLTextAreaElement>('.report-textarea'); area?.select(); document.execCommand('copy') }
     setCopied(true); window.setTimeout(() => setCopied(false), 2000)
   }
-  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1><p>프로젝트별 오픈 직무와 현재 진행 상황을 한 화면에서 확인합니다.</p></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
+  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div><small>프로젝트별 공고와 채용 진행 상황</small></header><div className="project-summary-table"><div className="project-summary-row project-summary-head"><span>프로젝트</span><span>공고별 채용 현황</span></div>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).map(([project, openings]) => <div className="project-summary-row" key={project}><span className="project-name"><b>{project}</b>{openings.some(opening => isNewOpening(opening.postedAt)) && <em className="new-badge">NEW</em>}</span><div className="opening-match-list">{[...openings].sort((a, b) => a.title.localeCompare(b.title, 'ko')).map(opening => { const note = notes.get(opening.id)!; return <div className="opening-match-row" key={opening.id}><span className="matched-role"><small>채용 직무</small><b>{roleName(opening, project)}</b></span><span className="matched-to"><small>목표 TO</small><b>{note.targetTo ? `${note.targetTo}명` : '미입력'}</b></span><span className="matched-plan"><small>채용 배경</small><b>{note.reason.trim() || '미입력'}</b></span><span className="matched-progress"><small>현재 진행</small><b>{openingSituation(opening, note)}</b></span></div> })}</div></div>)}</div></article>
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}>{project}</th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><b>{openingSituation(opening, note)}</b></td></tr> }) })}</tbody></table></div></article>
     {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 보고 문구</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>프로젝트 아래에 채용 직무, 채용 배경·TO, 현재 진행 순서로 정리됩니다. 문구는 아래에서 직접 수정할 수 있습니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 문구를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
   </section>
 }
@@ -226,21 +237,21 @@ function OpeningBoard({ opening }: { opening: Opening }) {
   const [note, setNote] = useState<OpeningNote>(() => loadNote(opening))
   const [form, setForm] = useState<OpeningNote>(() => loadNote(opening))
   useEffect(() => { const next = loadNote(opening); setNote(next); setForm(next); setEditing(false) }, [opening])
-  const remaining = Math.max(0, note.targetTo - opening.hiredCount)
+  const remaining = Math.max(0, opening.targetTo - opening.hiredCount)
   const visibleStages = stagesFor(opening, note)
   const save = () => {
-    const next = { ...form, targetTo: Math.max(0, Number(form.targetTo) || 0), enabledStages: PIPELINE_STAGES.filter(stage => form.enabledStages.includes(stage)) }
+    const next = { ...form, enabledStages: PIPELINE_STAGES.filter(stage => form.enabledStages.includes(stage)) }
     localStorage.setItem(noteKey(opening.id), JSON.stringify(next)); setNote(next); setEditing(false); setNotice('이 브라우저에 공고 설정을 저장했어요')
     window.setTimeout(() => setNotice(''), 2500)
   }
   const toggleStage = (stage: PipelineStage) => setForm(current => ({ ...current, enabledStages: current.enabledStages.includes(stage) ? current.enabledStages.filter(item => item !== stage) : [...current.enabledStages, stage] }))
-  return <section className="opening-view"><div className="opening-head"><div><span className="eyebrow">{opening.status === '진행중' ? 'ACTIVE OPENING' : 'CLOSED OPENING'}{isNewOpening(opening.postedAt) && <em className="new-badge head-badge">NEW</em>}</span><h1>{opening.title}</h1><p>{note.project || opening.project || '프로젝트 미지정'}{opening.url && <a href={opening.url} target="_blank" rel="noreferrer">게임잡 공고 <ExternalLink size={13} /></a>}</p></div><button className="outline" onClick={() => { setForm(note); setEditing(true) }}><Settings2 size={16} /> TO·전형·메모 편집</button></div>
-    <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${note.targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${opening.hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${opening.candidates.length}명`} /></div>
-    <div className="note-grid"><article className="reason-card"><span>채용 배경</span><p>{note.reason || '채용 배경을 입력해 주세요.'}</p></article><article className="reason-card"><span>메모</span><p>{note.memo || '이 공고에 대한 메모를 입력해 주세요.'}</p></article></div>
+  return <section className="opening-view"><div className="opening-head"><div><span className="eyebrow">ACTIVE OPENING{isNewOpening(opening) && <em className="new-badge head-badge">NEW</em>}</span><h1>{opening.title}</h1><p>{opening.project || '프로젝트 미지정'}</p></div><button className="outline" onClick={() => { setForm(note); setEditing(true) }}><Settings2 size={16} /> 전형·메모 편집</button></div>
+    <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${opening.targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${opening.hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${opening.candidates.length}명`} /></div>
+    <div className="note-grid"><article className="reason-card"><span>채용 배경</span><p>{opening.reason || '채용 배경 미입력'}</p></article><article className="reason-card"><span>메모</span><p>{note.memo || '이 공고에 대한 메모를 입력해 주세요.'}</p></article></div>
     <div className="board-title"><div><span>HIRING PIPELINE</span><h2>전형 진행 현황</h2></div><p><Clock3 size={14} /> 선택한 전형과 실제 지원자가 있는 단계만 표시합니다.</p></div>
-    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><b>{candidate.name}</b><small>{candidate.project || note.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
+    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><b>{candidate.name}</b><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
     {notice && <div className="toast">{notice}</div>}
-    {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(false)}><section className="modal wide-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>LOCAL OPENING SETTINGS</span><h2>TO·전형·메모</h2></div><button onClick={() => setEditing(false)}><X /></button></header><p className="local-help">이 내용은 현재 브라우저에만 저장되며 Google Sheet에는 반영되지 않습니다.</p><div className="form-grid"><label>프로젝트<input value={form.project} onChange={e => setForm({ ...form, project: e.target.value })} /></label><label>목표 TO<input type="number" min="0" value={form.targetTo} onChange={e => setForm({ ...form, targetTo: Number(e.target.value) })} /></label></div><fieldset className="stage-selector"><legend>사용 전형</legend><p>직무에 맞는 단계만 선택하세요. 실제 지원자가 있는 단계는 선택을 해제해도 화면에 유지됩니다.</p><div>{PIPELINE_STAGES.map(stage => <label key={stage}><input type="checkbox" checked={form.enabledStages.includes(stage)} onChange={() => toggleStage(stage)} /><span>{stage}</span></label>)}</div></fieldset><label>채용 배경<textarea rows={3} value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} /></label><label>메모<textarea rows={3} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} /></label><div className="modal-actions"><button className="outline" onClick={() => setEditing(false)}>취소</button><button className="primary" onClick={save}>이 브라우저에 저장</button></div></section></div>}
+    {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(false)}><section className="modal wide-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>LOCAL OPENING SETTINGS</span><h2>전형·메모</h2></div><button onClick={() => setEditing(false)}><X /></button></header><p className="local-help">목표 TO와 채용 배경은 TO정리 시트에서 불러옵니다. 전형 설정과 메모만 현재 브라우저에 저장됩니다.</p><fieldset className="stage-selector"><legend>사용 전형</legend><p>직무에 맞는 단계만 선택하세요. 실제 지원자가 있는 단계는 선택을 해제해도 화면에 유지됩니다.</p><div>{PIPELINE_STAGES.map(stage => <label key={stage}><input type="checkbox" checked={form.enabledStages.includes(stage)} onChange={() => toggleStage(stage)} /><span>{stage}</span></label>)}</div></fieldset><label>메모<textarea rows={3} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} /></label><div className="modal-actions"><button className="outline" onClick={() => setEditing(false)}>취소</button><button className="primary" onClick={save}>이 브라우저에 저장</button></div></section></div>}
   </section>
 }
 

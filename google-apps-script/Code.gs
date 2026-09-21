@@ -16,6 +16,25 @@ function dashboard_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var interview = findSheet_(ss, ['1. 2026 Interviewee', '2026 Interviewee']);
   if (!interview) throw new Error('지원자 시트(1. 2026 Interviewee)를 찾지 못했습니다.');
+  var openingSheet = findSheet_(ss, ['TO정리', '4. TO정리', '4. TO 정리']);
+  if (!openingSheet) throw new Error('TO정리 시트를 찾지 못했습니다.');
+
+  var openingTable = openingTable_(openingSheet);
+  var openings = [];
+  for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
+    var openingRow = openingTable.values[o];
+    var openingProject = clean_(openingRow[openingTable.columns.project]);
+    var openingTitle = clean_(openingRow[openingTable.columns.title]);
+    if (!openingProject || !openingTitle) continue;
+    openings.push({
+      row: o + 1,
+      project: openingProject,
+      title: openingTitle,
+      targetTo: number_(openingRow[openingTable.columns.targetTo]),
+      reason: clean_(openingRow[openingTable.columns.reason])
+    });
+  }
+
   var candidateTable = table_(interview, ['진행단계','이름','직무(공고명)']);
   var col = candidateTable.columns;
   var candidates = [];
@@ -28,7 +47,8 @@ function dashboard_() {
     var title = clean_(row[col['직무(공고명)']]);
     var project = col['PJ'] == null ? '' : clean_(row[col['PJ']]);
     if (!title) continue;
-    if (stage === 'Hired') hiredCounts[title] = (hiredCounts[title] || 0) + 1;
+    var openingKey = key_(project, title);
+    if (stage === 'Hired') hiredCounts[openingKey] = (hiredCounts[openingKey] || 0) + 1;
     if (name && ACTIVE_STAGES.indexOf(stage) >= 0) {
       candidates.push({
         id: 'row-' + (i + 1),
@@ -43,10 +63,34 @@ function dashboard_() {
 
   return {
     ok: true,
+    openings: openings,
     candidates: candidates,
     hiredCounts: hiredCounts,
     syncedAt: new Date().toISOString()
   };
+}
+
+function openingTable_(sheet) {
+  var values = sheet.getDataRange().getDisplayValues();
+  var aliases = {
+    project: ['프로젝트', '프로젝트명', '프로젝트 명', '프로젝트 이름', 'PJ'],
+    title: ['공고명', '공고 이름', '직무(공고명)'],
+    targetTo: ['채용인원', '채용 인원', 'TO', '목표 TO'],
+    reason: ['채용사유', '채용 사유', '채용배경', '채용 배경']
+  };
+  for (var r = 0; r < Math.min(values.length, 40); r++) {
+    var columns = {};
+    values[r].forEach(function(value, index) {
+      var header = clean_(value);
+      Object.keys(aliases).forEach(function(key) {
+        if (aliases[key].indexOf(header) >= 0) columns[key] = index;
+      });
+    });
+    if (columns.project != null && columns.title != null && columns.targetTo != null && columns.reason != null) {
+      return { values: values, headerRow: r + 1, columns: columns };
+    }
+  }
+  throw new Error(sheet.getName() + ' 시트에서 프로젝트, 공고명, 채용인원, 채용사유 헤더를 찾지 못했습니다.');
 }
 
 function table_(sheet, required) {
@@ -73,6 +117,15 @@ function findSheet_(ss, names) {
 
 function clean_(value) {
   return value == null ? '' : String(value).trim();
+}
+
+function number_(value) {
+  var match = clean_(value).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  return match ? Math.max(0, Number(match[0]) || 0) : 0;
+}
+
+function key_(project, title) {
+  return clean_(project).replace(/\s+/g, ' ').toLowerCase() + '\u001f' + clean_(title).replace(/\s+/g, ' ').toLowerCase();
 }
 
 function output_(value) {

@@ -1,135 +1,109 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import re
-import sys
-import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import parse_qs, urljoin, urlparse
 
 import httpx
-from bs4 import BeautifulSoup
-
-LIST_URL = "https://www.gamejob.co.kr/Recruit/joblist?menucode=searchdetail"
-PAGE_URL = "https://www.gamejob.co.kr/Recruit/_GI_Job_List/"
-COMPANY_KEYWORDS = ("콩스튜디오코리아", "kong studios korea")
 
 
-def text(node, selector: str) -> str:
-    found = node.select_one(selector)
-    return found.get_text(" ", strip=True) if found else ""
+def normalized(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
 
 
-def date_value(value: str) -> str:
-    match = re.search(r"(\d{1,2})[./-](\d{1,2})", value or "")
-    return f"{datetime.now().year}-{int(match.group(1)):02d}-{int(match.group(2)):02d}" if match else ""
+def opening_key(project: object, title: object) -> str:
+    return f"{normalized(project)}\x1f{normalized(title)}"
 
 
-def parse_rows(html: str, base_url: str) -> list[dict[str, str]]:
-    jobs: list[dict[str, str]] = []
-    soup = BeautifulSoup(html, "html.parser")
-    for row in soup.select("table.tblList tbody tr"):
-        link = row.select_one(".tit a[href*='GI_No']")
-        company = text(row, ".company strong")
-        if not link or not link.get("href") or not any(key in company.lower() for key in COMPANY_KEYWORDS):
-            continue
-        url = urljoin(base_url, str(link["href"]))
-        query = parse_qs(urlparse(url).query)
-        gi_no = (query.get("GI_No") or query.get("gi_no") or [""])[0]
-        if not gi_no:
-            match = re.search(r"GI_No=(\d+)", url, re.I)
-            gi_no = match.group(1) if match else ""
-        if not gi_no:
-            continue
-        title_node = row.select_one(".tit a strong") or link
-        deadline_text = text(row, "span.date")
-        jobs.append({
-            "id": f"gamejob-{gi_no}",
-            "title": title_node.get_text(" ", strip=True),
-            "url": url,
-            "postedAt": date_value(text(row, ".modifyDate")),
-            "deadline": "" if "상시" in deadline_text or "채용시" in deadline_text else date_value(deadline_text),
-        })
-    return jobs
+def opening_id(project: object, title: object) -> str:
+    digest = hashlib.sha256(opening_key(project, title).encode("utf-8")).hexdigest()[:16]
+    return f"sheet-{digest}"
 
 
-def collect() -> list[dict[str, str]]:
-    headers = {"User-Agent": "KongStudios-Recruiting-Dashboard/1.0", "Accept-Language": "ko-KR,ko;q=0.9"}
-    found: dict[str, dict[str, str]] = {}
-    with httpx.Client(headers=headers, timeout=30, follow_redirects=True) as client:
-        for page in range(1, 81):
-            if page == 1:
-                response = client.get(LIST_URL)
-            else:
-                response = client.post(PAGE_URL, data={"condition[menucode]": "searchdetail", "page": str(page), "direct": "0", "order": "1", "pagesize": "40", "tabcode": "1"}, headers={"Referer": LIST_URL, "X-Requested-With": "XMLHttpRequest"})
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            if not soup.select("table.tblList tbody tr"):
-                break
-            for job in parse_rows(response.text, str(response.url)):
-                found[job["id"]] = job
-            time.sleep(0.35)
-    return sorted(found.values(), key=lambda item: item["id"])
-
-
-def build_dashboard(jobs: list[dict[str, str]], sheet_data: dict) -> tuple[dict, int]:
-    candidates_by_title: dict[str, list[dict]] = defaultdict(list)
+def build_dashboard(sheet_data: dict) -> tuple[dict, int]:
+    candidates_by_opening: dict[str, list[dict]] = defaultdict(list)
     for candidate in sheet_data.get("candidates", []):
-        title = str(candidate.get("openingTitle") or "").strip()
-        if title:
-            candidates_by_title[title].append(candidate)
-    hired_counts = sheet_data.get("hiredCounts") if isinstance(sheet_data.get("hiredCounts"), dict) else {}
+        key = opening_key(candidate.get("project"), candidate.get("openingTitle"))
+        if key.strip("\x1f"):
+            candidates_by_opening[key].append(candidate)
 
+    hired_counts = sheet_data.get("hiredCounts") if isinstance(sheet_data.get("hiredCounts"), dict) else {}
     openings = []
-    current_titles = {job["title"].strip() for job in jobs}
-    for job in jobs:
-        title = job["title"].strip()
-        candidates = candidates_by_title.get(title, [])
-        project = next((str(item.get("project") or "").strip() for item in candidates if item.get("project")), "")
+    current_keys: set[str] = set()
+    seen_ids: set[str] = set()
+
+    for source in sheet_data.get("openings", []):
+        project = str(source.get("project") or "").strip()
+        title = str(source.get("title") or "").strip()
+        if not project or not title:
+            continue
+        key = opening_key(project, title)
+        item_id = opening_id(project, title)
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
+        current_keys.add(key)
+        candidates = candidates_by_opening.get(key, [])
         openings.append({
-            **job,
-            "source": "gamejob",
+            "id": item_id,
+            "title": title,
+            "url": "",
+            "postedAt": "",
+            "deadline": "",
+            "source": "sheet",
             "status": "진행중",
             "project": project,
-            "targetTo": 0,
-            "hiredCount": int(hired_counts.get(title, 0) or 0),
-            "reason": "",
+            "targetTo": max(0, int(float(source.get("targetTo") or 0))),
+            "hiredCount": int(hired_counts.get(key, 0) or 0),
+            "reason": str(source.get("reason") or "").strip(),
             "candidates": candidates,
         })
 
+    openings.sort(key=lambda item: (normalized(item["project"]), normalized(item["title"])))
     dashboard = {
         "openings": openings,
         "candidateCount": sum(len(opening["candidates"]) for opening in openings),
         "syncedAt": datetime.now(timezone.utc).isoformat(),
     }
-    unmatched = sum(len(items) for title, items in candidates_by_title.items() if title not in current_titles)
+    unmatched = sum(len(items) for key, items in candidates_by_opening.items() if key not in current_keys)
     return dashboard, unmatched
 
 
 def main() -> int:
-    jobs = collect()
-    if not jobs:
-        raise RuntimeError("콩스튜디오코리아 공고를 찾지 못해 기존 상태를 유지합니다.")
-    if "--dry-run" in sys.argv:
-        print(json.dumps(jobs, ensure_ascii=False, indent=2))
-        return 0
     endpoint, token = os.getenv("SHEET_API_URL", ""), os.getenv("SHEET_API_TOKEN", "")
     if not endpoint or not token:
         raise RuntimeError("SHEET_API_URL 또는 SHEET_API_TOKEN Secret이 없습니다.")
-    response = httpx.post(endpoint, content=json.dumps({"action": "dashboard", "token": token}, ensure_ascii=False).encode(), headers={"Content-Type": "text/plain;charset=utf-8"}, timeout=60, follow_redirects=True)
+
+    response = httpx.post(
+        endpoint,
+        content=json.dumps({"action": "dashboard", "token": token}, ensure_ascii=False).encode(),
+        headers={"Content-Type": "text/plain;charset=utf-8"},
+        timeout=httpx.Timeout(connect=30, read=60, write=30, pool=30),
+        follow_redirects=True,
+    )
     response.raise_for_status()
     sheet_data = response.json()
-    if not sheet_data.get("ok") or not isinstance(sheet_data.get("candidates"), list):
-        raise RuntimeError(sheet_data.get("error") or "지원자 데이터를 가져오지 못했습니다.")
+    if (
+        not sheet_data.get("ok")
+        or not isinstance(sheet_data.get("openings"), list)
+        or not isinstance(sheet_data.get("candidates"), list)
+    ):
+        raise RuntimeError(sheet_data.get("error") or "TO정리 또는 지원자 데이터를 가져오지 못했습니다.")
 
-    dashboard, unmatched = build_dashboard(jobs, sheet_data)
+    dashboard, unmatched = build_dashboard(sheet_data)
+    if not dashboard["openings"]:
+        raise RuntimeError("TO정리 시트에 표시할 공고가 없어 기존 배포 상태를 유지합니다.")
+
     output = Path(__file__).resolve().parents[1] / "public" / "data" / "dashboard.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(dashboard, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"게임잡 공고 {len(jobs)}건과 진행 지원자 {dashboard['candidateCount']}명을 결합했습니다. 제목 불일치 지원자 {unmatched}명")
+    print(
+        f"TO정리 공고 {len(dashboard['openings'])}건과 진행 지원자 "
+        f"{dashboard['candidateCount']}명을 연결했습니다. 공고 불일치 지원자 {unmatched}명"
+    )
     return 0
 
 

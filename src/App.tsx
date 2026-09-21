@@ -69,10 +69,15 @@ function stageStatus(opening: Opening) {
     '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼',
   }
   return PIPELINE_STAGES.flatMap(stage => {
-    const count = opening.candidates.filter(candidate => candidate.stage === stage).length
+    const stageCandidates = opening.candidates.filter(candidate => candidate.stage === stage)
+    const count = stageCandidates.length
     if (!count) return []
     const suffix = stage === '면접' ? `${count}명` : `${count}명 진행 중`
-    return [`${labels[stage]} ${suffix}`]
+    const offerDates = stage === 'Offer'
+      ? stageCandidates.filter(candidate => candidate.hireDate).map(candidate => `${candidate.name}: ${candidate.hireDate} 입사 예정`)
+      : []
+    const offerDetail = offerDates.length ? ` (${offerDates.join(' · ')})` : ''
+    return [`${labels[stage]} ${suffix}${offerDetail}`]
   })
 }
 
@@ -199,17 +204,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [selectedId, setSelectedId] = useState(REPORT_ID)
   const [query, setQuery] = useState('')
   const [refreshNotice, setRefreshNotice] = useState('')
-  const load = async (manual = false) => {
+  const load = async () => {
     setLoading(true); setError('')
     try {
-      const previousSyncedAt = data?.syncedAt
-      const next = await api.dashboard(); setData(next)
-      setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
-      if (manual) {
-        const unchanged = previousSyncedAt && previousSyncedAt === next.syncedAt
-        setRefreshNotice(unchanged ? '새로운 동기화 데이터가 아직 없어요. 현재 배포 데이터를 다시 확인했습니다.' : '최신 배포 데이터를 반영했습니다.')
-        window.setTimeout(() => setRefreshNotice(''), 3500)
+      const deployed = await api.dashboard()
+      let next = deployed
+      try {
+        next = await api.liveDashboard(deployed)
+      } catch (liveError) {
+        setRefreshNotice(`최신 시트를 불러오지 못해 마지막 배포 데이터를 표시합니다. ${liveError instanceof Error ? liveError.message : ''}`.trim())
+        window.setTimeout(() => setRefreshNotice(''), 7000)
       }
+      setData(next)
+      setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
     } catch (e) { setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.') }
     finally { setLoading(false) }
   }
@@ -229,7 +236,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       setSyncing(false)
     }
   }
-  useEffect(() => { void load(false) }, [])
+  useEffect(() => { void load() }, [])
   const openings = useMemo(() => (data?.openings || []).filter(x => `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query])
   const selected = data?.openings.find(x => x.id === selectedId) || null
   const goHome = () => setSelectedId(REPORT_ID)
@@ -285,7 +292,7 @@ function OpeningBoard({ opening }: { opening: Opening }) {
     <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${opening.targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${opening.hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${opening.candidates.length}명`} /></div>
     <div className="note-grid"><article className="reason-card"><span>채용 배경</span><p>{opening.reason || '채용 배경 미입력'}</p></article><article className="reason-card"><span>메모</span><p>{note.memo || '이 공고에 대한 메모를 입력해 주세요.'}</p></article></div>
     <div className="board-title"><div><span>HIRING PIPELINE</span><h2>전형 진행 현황</h2></div><p><Clock3 size={14} /> 선택한 전형과 실제 지원자가 있는 단계만 표시합니다.</p></div>
-    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><b>{candidate.name}</b><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
+    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><div className="candidate-name"><b>{candidate.name}</b>{candidate.stage === 'Offer' && candidate.hireDate && <strong className="hire-date">› {candidate.hireDate} 입사 예정</strong>}</div><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
     {notice && <div className="toast">{notice}</div>}
     {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(false)}><section className="modal wide-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>LOCAL OPENING SETTINGS</span><h2>전형·메모</h2></div><button onClick={() => setEditing(false)}><X /></button></header><p className="local-help">목표 TO와 채용 배경은 연동용 사본의 Dashboard_TO 탭에서 불러옵니다. 전형 설정과 메모만 현재 브라우저에 저장됩니다.</p><fieldset className="stage-selector"><legend>사용 전형</legend><p>직무에 맞는 단계만 선택하세요. 실제 지원자가 있는 단계는 선택을 해제해도 화면에 유지됩니다.</p><div>{PIPELINE_STAGES.map(stage => <label key={stage}><input type="checkbox" checked={form.enabledStages.includes(stage)} onChange={() => toggleStage(stage)} /><span>{stage}</span></label>)}</div></fieldset><label>메모<textarea rows={3} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} /></label><div className="modal-actions"><button className="outline" onClick={() => setEditing(false)}>취소</button><button className="primary" onClick={save}>이 브라우저에 저장</button></div></section></div>}
   </section>

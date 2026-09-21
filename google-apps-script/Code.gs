@@ -60,6 +60,7 @@ function dashboard_() {
 
   var candidateTable = table_(interview, ['진행단계','이름','직무(공고명)']);
   var col = candidateTable.columns;
+  var hireDateColumn = firstColumn_(col, ['입사 확정 날짜', '입사확정날짜', '입사 확정일', '입사확정일', '입사예정일']);
   var candidates = [];
   var hiredCounts = {};
 
@@ -79,7 +80,8 @@ function dashboard_() {
         name: name,
         stage: stage,
         project: project,
-        openingTitle: title
+        openingTitle: title,
+        hireDate: hireDateColumn == null ? '' : clean_(row[hireDateColumn])
       });
     }
   }
@@ -134,6 +136,13 @@ function findSheet_(ss, names) {
   for (var i = 0; i < names.length; i++) {
     var sheet = ss.getSheetByName(names[i]);
     if (sheet) return sheet;
+  }
+  return null;
+}
+
+function firstColumn_(columns, names) {
+  for (var i = 0; i < names.length; i++) {
+    if (columns[names[i]] != null) return columns[names[i]];
   }
   return null;
 }

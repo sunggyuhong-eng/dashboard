@@ -12,6 +12,7 @@ export type Candidate = {
   stage: PipelineStage
   project: string
   openingTitle: string
+  hireDate?: string
 }
 
 export type Opening = {

@@ -1,10 +1,10 @@
 # 콩스튜디오 채용 대시보드
 
-Google Sheet의 TO정리와 지원자 진행 단계를 GitHub Pages에서 조회하는 읽기 전용 대시보드입니다.
+원본과 `IMPORTRANGE`로 연결된 대시보드 전용 사본에서 TO와 지원자 진행 단계를 읽어 GitHub Pages에 표시하는 읽기 전용 대시보드입니다.
 
 ## 주요 기능
 
-- `TO정리` 시트의 프로젝트·공고명·채용인원·채용사유를 매시간 자동 반영
+- 연동용 사본의 `Dashboard_TO`와 `Dashboard_지원자` 탭을 매시간 자동 반영
 - 브라우저에서 처음 확인한 신규 공고에 7일 동안 `NEW` 표시
 - 메인 상단에는 오픈 공고, 목표 TO, 진행 지원자 3개 핵심 지표만 표시
 - 채용 현황을 `프로젝트 | 채용 직무 | 목표 TO | 채용 배경 | 현재 진행` 표로 표시
@@ -30,11 +30,12 @@ Google Sheet의 TO정리와 지원자 진행 단계를 GitHub Pages에서 조회
 
 ## 데이터 흐름
 
-1. Apps Script가 `TO정리` 시트의 A:D열과 지원자 시트의 필요한 열만 읽어 반환합니다.
-2. GitHub Actions가 프로젝트명과 공고명을 기준으로 공고와 지원자를 연결합니다.
-3. `TO정리`에 있는 공고만 현재 오픈 공고로 표시합니다.
-4. 결합 결과를 `dashboard.json`으로 만든 후 GitHub Pages에 배포합니다.
-5. 대시보드는 배포된 JSON을 읽기만 하며 Google Sheet에는 아무것도 쓰지 않습니다.
+1. 연동용 사본이 `IMPORTRANGE`로 원본의 필요한 열만 가져옵니다.
+2. Apps Script가 사본의 `Dashboard_TO`와 `Dashboard_지원자` 탭만 읽어 반환합니다.
+3. GitHub Actions가 프로젝트명과 공고명을 기준으로 공고와 지원자를 연결합니다.
+4. `Dashboard_TO`에 있는 공고만 현재 오픈 공고로 표시합니다.
+5. 결합 결과를 `dashboard.json`으로 만든 후 GitHub Pages에 배포합니다.
+6. 대시보드는 배포된 JSON을 읽기만 하며 원본과 연동용 사본에는 아무것도 쓰지 않습니다.
 
 상단의 `데이터 다시 불러오기`는 브라우저 캐시를 사용하지 않고 현재 GitHub Pages에 배포된 JSON을 다시 읽습니다. 이 버튼만으로 Google Sheet를 새로 동기화하지는 않습니다. 원본 변경분을 즉시 반영하려면 GitHub Actions의 `Sync recruiting data and deploy Pages`를 실행한 뒤 이 버튼을 누릅니다.
 
@@ -51,7 +52,7 @@ Google Sheet의 TO정리와 지원자 진행 단계를 GitHub Pages에서 조회
 
 ## 2. Google Apps Script 설치
 
-1. 지원자 관리 Google Sheet를 엽니다.
+1. 연동용 `채용 대시보드 시트`를 엽니다.
 2. `확장 프로그램 → Apps Script`를 선택합니다.
 3. 기본 코드를 지우고 `google-apps-script/Code.gs` 전체를 붙여넣습니다.
 4. `프로젝트 설정 → 스크립트 속성`에 아래 값을 등록합니다.
@@ -61,14 +62,14 @@ Google Sheet의 TO정리와 지원자 진행 단계를 GitHub Pages에서 조회
 6. 실행 사용자는 `나`, 액세스 사용자는 `모든 사용자`로 설정합니다.
 7. 배포 후 `/exec`로 끝나는 웹 앱 URL을 복사합니다.
 
-Apps Script는 다음 기존 탭만 읽습니다.
+Apps Script는 연동용 사본의 다음 탭만 읽습니다.
 
-- 지원자: `1. 2026 Interviewee`
-- 공고: `TO정리`
+- 지원자: `Dashboard_지원자`
+- 공고: `Dashboard_TO`
 
 지원자 시트에서 필요한 헤더는 `진행단계`, `이름`, `직무(공고명)`입니다. `PJ` 열이 있으면 프로젝트명으로 사용합니다.
 
-`TO정리` 시트는 다음 순서로 관리합니다.
+`Dashboard_TO` 시트는 다음 순서로 관리합니다.
 
 | 열 | 데이터 |
 |---|---|

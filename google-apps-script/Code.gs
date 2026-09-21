@@ -14,10 +14,10 @@ function doPost(e) {
 
 function dashboard_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var interview = findSheet_(ss, ['1. 2026 Interviewee', '2026 Interviewee']);
-  if (!interview) throw new Error('지원자 시트(1. 2026 Interviewee)를 찾지 못했습니다.');
-  var openingSheet = findSheet_(ss, ['TO정리', '4. TO정리', '4. TO 정리']);
-  if (!openingSheet) throw new Error('TO정리 시트를 찾지 못했습니다.');
+  var interview = findSheet_(ss, ['Dashboard_지원자']);
+  if (!interview) throw new Error('연동용 사본에서 Dashboard_지원자 시트를 찾지 못했습니다.');
+  var openingSheet = findSheet_(ss, ['Dashboard_TO']);
+  if (!openingSheet) throw new Error('연동용 사본에서 Dashboard_TO 시트를 찾지 못했습니다.');
 
   var openingTable = openingTable_(openingSheet);
   var openings = [];

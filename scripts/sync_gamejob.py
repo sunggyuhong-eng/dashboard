@@ -91,17 +91,17 @@ def main() -> int:
         or not isinstance(sheet_data.get("openings"), list)
         or not isinstance(sheet_data.get("candidates"), list)
     ):
-        raise RuntimeError(sheet_data.get("error") or "TO정리 또는 지원자 데이터를 가져오지 못했습니다.")
+        raise RuntimeError(sheet_data.get("error") or "연동용 사본의 공고 또는 지원자 데이터를 가져오지 못했습니다.")
 
     dashboard, unmatched = build_dashboard(sheet_data)
     if not dashboard["openings"]:
-        raise RuntimeError("TO정리 시트에 표시할 공고가 없어 기존 배포 상태를 유지합니다.")
+        raise RuntimeError("Dashboard_TO 탭에 표시할 공고가 없어 기존 배포 상태를 유지합니다.")
 
     output = Path(__file__).resolve().parents[1] / "public" / "data" / "dashboard.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(dashboard, ensure_ascii=False, indent=2), encoding="utf-8")
     print(
-        f"TO정리 공고 {len(dashboard['openings'])}건과 진행 지원자 "
+        f"Dashboard_TO 공고 {len(dashboard['openings'])}건과 진행 지원자 "
         f"{dashboard['candidateCount']}명을 연결했습니다. 공고 불일치 지원자 {unmatched}명"
     )
     return 0

@@ -37,9 +37,9 @@
 3. GitHub Actions가 프로젝트명과 공고명을 기준으로 공고와 지원자를 연결합니다.
 4. `Dashboard_TO`에 있는 공고만 현재 오픈 공고로 표시합니다.
 5. 결합 결과를 `dashboard.json`으로 만든 후 GitHub Pages에 배포합니다.
-6. 대시보드는 배포된 JSON을 읽기만 하며 원본과 연동용 사본에는 아무것도 쓰지 않습니다.
+6. 대시보드는 배포된 JSON을 기본으로 읽으며 원본과 연동용 사본에는 아무것도 쓰지 않습니다.
 
-상단의 `데이터 다시 불러오기`는 GitHub Actions의 `Sync recruiting data and deploy Pages`를 실행합니다. 버튼은 약 8초 간격으로 새 배포를 확인하고, 완료되면 새 시트 데이터를 화면에 자동 반영합니다. 일반적으로 1~3분 정도 걸리며 버튼을 다시 누르거나 페이지를 새로고침할 필요가 없습니다.
+상단의 `데이터 다시 불러오기`는 Cloudflare나 GitHub Actions를 거치지 않고 Apps Script의 읽기 전용 API에서 최신 데이터를 받아 현재 브라우저 화면에 바로 반영합니다. 정식 배포 데이터는 기존대로 매시간 7분 GitHub Actions가 갱신합니다.
 
 지원자 이름과 진행 단계는 배포 결과의 JSON에 포함됩니다. 로그인 없는 GitHub Pages를 사용하므로 사이트 주소를 아는 사람은 이 데이터를 볼 수 있습니다.
 
@@ -96,43 +96,18 @@ Apps Script에는 `insertSheet`, `setValue`, `appendRow` 같은 쓰기 코드가
 3. `Run workflow`를 실행합니다.
 4. 작업이 완료되면 `Settings → Pages`에 대시보드 주소가 표시됩니다.
 
-이후 매시간 7분에 자동으로 공고와 지원자 현황을 갱신합니다. 시트를 수정한 직후 바로 반영하려면 같은 workflow를 수동 실행합니다.
+이후 매시간 7분에 자동으로 공고와 지원자 현황을 갱신합니다. 시트를 수정한 직후에는 대시보드의 `데이터 다시 불러오기`를 누르면 현재 화면에 바로 반영됩니다.
 
-## 5. 대시보드 버튼에서 즉시 동기화 실행
+## 5. 즉시 불러오기 기능 적용
 
-GitHub 토큰을 브라우저에 노출하지 않기 위해 `cloudflare-worker` 폴더의 중계 코드를 Cloudflare Worker에 한 번 배포합니다. GitHub Pages는 그대로 사용합니다.
+1. ZIP의 최신 `google-apps-script/Code.gs`를 기존 Apps Script 편집기에 전체 덮어씁니다.
+2. `배포 → 배포 관리 → 수정`을 누릅니다.
+3. 버전을 `새 버전`으로 선택하고 다시 배포합니다.
+4. 기존 `/exec` 주소가 유지되는지 확인합니다.
+5. GitHub의 `SHEET_API_URL` Secret은 기존 값을 그대로 사용합니다.
+6. GitHub Actions의 `Sync recruiting data and deploy Pages`를 한 번 실행합니다.
 
-### GitHub 토큰 준비
-
-1. GitHub 프로필의 `Settings → Developer settings → Personal access tokens → Fine-grained tokens`로 이동합니다.
-2. 새 토큰의 Repository access를 `Only select repositories`로 정하고 `dashboard` 저장소만 선택합니다.
-3. Repository permissions에서 `Actions`를 `Read and write`로 지정해 토큰을 만듭니다.
-4. 생성 직후 표시되는 토큰을 복사합니다. 이 값은 GitHub 저장소나 브라우저 코드에 넣지 않습니다.
-
-### Cloudflare Worker 만들기
-
-1. Cloudflare의 `Workers & Pages → Create → Worker`에서 `kong-dashboard-refresh` Worker를 만듭니다.
-2. Worker 편집기에 `cloudflare-worker/worker.js` 전체를 붙여넣고 배포합니다.
-3. Worker의 `Settings → Variables and Secrets`에서 `GITHUB_ACTIONS_TOKEN`을 Secret으로 추가하고 위 GitHub 토큰을 입력합니다.
-4. 일반 변수는 다음 값으로 등록합니다.
-
-| 변수 | 값 |
-|---|---|
-| `ALLOWED_ORIGIN` | `https://sunggyuhong-eng.github.io` |
-| `GITHUB_OWNER` | `sunggyuhong-eng` |
-| `GITHUB_REPOSITORY` | `dashboard` |
-| `GITHUB_WORKFLOW` | `sync-and-deploy.yml` |
-
-5. 배포 후 `https://kong-dashboard-refresh...workers.dev` 형태의 Worker 주소를 복사합니다.
-
-### 대시보드에 Worker 주소 연결
-
-1. GitHub의 `dashboard` 저장소에서 `Settings → Secrets and variables → Actions → Variables`로 이동합니다.
-2. Repository variable `REFRESH_API_URL`을 만들고 Worker 주소를 입력합니다.
-3. `Actions → Sync recruiting data and deploy Pages → Run workflow`를 한 번 실행합니다.
-4. 이후부터 대시보드의 `데이터 다시 불러오기` 버튼이 Actions를 실행하고 완료된 데이터를 자동 반영합니다.
-
-Worker에는 60초 중복 실행 방지가 들어 있습니다. GitHub 토큰은 Worker Secret에만 저장되며 대시보드 빌드 결과에는 포함되지 않습니다.
+`REFRESH_API_URL`, GitHub 개인 토큰, Cloudflare Worker는 사용하지 않습니다. 즉시 불러오기는 읽기 전용이며 시트의 탭·행·셀을 생성하거나 수정하지 않습니다.
 
 ## 브라우저 메모
 
@@ -145,7 +120,7 @@ Worker에는 60초 중복 실행 방지가 들어 있습니다. GitHub 토큰은
 
 ## 슬랙 리포트
 
-- 메인 화면의 `리포트 생성하기`를 누르면 프로젝트 → 채용 직무 → 채용 배경·TO → 현재 진행 순서로 보고 문구를 만듭니다.
+- 메인 화면의 `리포트 생성하기`를 누르면 채용 현황의 `프로젝트 | 채용 직무 | 목표 TO | 채용 배경 | 현재 진행` 구성을 Slack 고정폭 표로 만듭니다.
 - 진행 지원자가 없는 공고는 `이력서 검토 중`으로만 표시합니다.
 - 진행 지원자가 있는 공고에는 단계별 현재 인원, 시트의 채용 배경, 브라우저 메모가 반영됩니다.
 - 생성된 문구는 팝업에서 수정한 뒤 `Slack 문구 복사`로 복사할 수 있습니다.

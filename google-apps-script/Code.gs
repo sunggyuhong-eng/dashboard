@@ -1,5 +1,28 @@
 var ACTIVE_STAGES = ['온라인 과제','코딩테스트','역량검사','면접','1차 면접','2차 면접','면접합격','처우단계','Offer'];
 
+// GitHub Pages의 '데이터 다시 불러오기' 전용 읽기 API입니다.
+// JSONP 콜백만 허용하며 시트에는 어떤 값도 쓰지 않습니다.
+function doGet(e) {
+  try {
+    var callback = clean_(e && e.parameter && e.parameter.callback);
+    if (!/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+      return output_({ ok: false, error: '올바르지 않은 콜백입니다.' });
+    }
+    return ContentService
+      .createTextOutput(callback + '(' + JSON.stringify(dashboard_()) + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  } catch (error) {
+    var message = String(error && error.message ? error.message : error);
+    var safeCallback = clean_(e && e.parameter && e.parameter.callback);
+    if (/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(safeCallback)) {
+      return ContentService
+        .createTextOutput(safeCallback + '(' + JSON.stringify({ ok: false, error: message }) + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return output_({ ok: false, error: message });
+  }
+}
+
 function doPost(e) {
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');

@@ -12,8 +12,6 @@ const NOTE_PREFIX = 'kong-recruiting-note:'
 const REPORT_ID = '__report__'
 const AUTH_KEY = 'kong-recruiting-authenticated'
 const PASSWORD_HASH = '5acc4f34e4cc64ca45390a50c9f84d960b49639390b75fc5eb46b542a90dac66'
-const SYNC_POLL_INTERVAL_MS = 8_000
-const SYNC_POLL_LIMIT = 38
 
 function noteKey(openingId: string) { return `${NOTE_PREFIX}${openingId}` }
 function isArtOpening(title: string) { return /art|아트|애니메|컨셉|원화|모델|ui|ux|이펙트|vfx/i.test(title) }
@@ -85,6 +83,49 @@ function openingSituation(opening: Opening, note: OpeningNote) {
   return memo ? `${status} · ${memo}` : status
 }
 
+function visualWidth(value: string) {
+  return Array.from(value).reduce((width, character) => width + (/[^\u0000-\u00ff]/.test(character) ? 2 : 1), 0)
+}
+
+function wrapTableCell(value: string, width: number) {
+  const source = value.replace(/[`\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() || '-'
+  const lines: string[] = []
+  let line = ''
+  for (const character of Array.from(source)) {
+    if (line && visualWidth(line + character) > width) {
+      lines.push(line.trimEnd())
+      line = ''
+    }
+    line += character
+  }
+  if (line || !lines.length) lines.push(line.trimEnd())
+  return lines
+}
+
+function padTableCell(value: string, width: number) {
+  return value + ' '.repeat(Math.max(0, width - visualWidth(value)))
+}
+
+function slackTable(openings: Opening[], notes: Map<string, OpeningNote>) {
+  const widths = [12, 22, 7, 26, 38]
+  const headers = ['프로젝트', '채용 직무', '목표 TO', '채용 배경', '현재 진행']
+  const rows = openings.map(opening => {
+    const project = projectName(opening)
+    return [project, roleName(opening, project), opening.targetTo ? `${opening.targetTo}명` : '미입력', opening.reason.trim() || '미입력', openingSituation(opening, notes.get(opening.id)!)]
+  })
+  const renderRow = (cells: string[]) => cells.map((cell, index) => padTableCell(cell, widths[index])).join(' | ')
+  const lines = [renderRow(headers), widths.map(width => '-'.repeat(width)).join('-+-')]
+  rows.forEach(row => {
+    const wrapped = row.map((cell, index) => wrapTableCell(cell, widths[index]))
+    const height = Math.max(...wrapped.map(cell => cell.length))
+    for (let line = 0; line < height; line += 1) {
+      lines.push(renderRow(wrapped.map(cell => cell[line] || '')))
+    }
+    lines.push(widths.map(width => '-'.repeat(width)).join('-+-'))
+  })
+  return lines.join('\n')
+}
+
 function createSlackReport(openings: Opening[]) {
   const notes = new Map(openings.map(opening => [opening.id, loadNote(opening)]))
   const groups = new Map<string, Opening[]>()
@@ -101,17 +142,10 @@ function createSlackReport(openings: Opening[]) {
     `*전체 요약*  • 오픈 공고 \`${openings.length}개\`  • 목표 TO \`${targetTo ? `${targetTo}명` : '미입력'}\`  • 진행 지원자 \`${candidateCount}명\``,
     '',
   ]
-  Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).forEach(([project, projectOpenings]) => {
-    lines.push(`*${project}*`)
-    projectOpenings.sort((a, b) => a.title.localeCompare(b.title, 'ko')).forEach(opening => {
-      const note = notes.get(opening.id)!
-      lines.push(`• *${roleName(opening, project)}*`)
-      lines.push(`  ◦ 채용 배경: ${opening.reason.trim() || '미입력'}`)
-      lines.push(`  ◦ TO: ${opening.targetTo ? `${opening.targetTo}명` : '미입력'}`)
-      lines.push(`  ◦ 현재 진행: ${openingSituation(opening, note)}`)
-    })
-    lines.push('')
-  })
+  const sorted = Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b, 'ko'))
+    .flatMap(([, projectOpenings]) => [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')))
+  lines.push('```', slackTable(sorted, notes), '```')
   return lines.join('\n').trim()
 }
 
@@ -181,23 +215,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   }
   const syncNow = async () => {
     if (syncing) return
-    const previousSyncedAt = data?.syncedAt || ''
-    setSyncing(true); setError(''); setRefreshNotice('GitHub Actions 실행을 요청하고 있어요.')
+    setSyncing(true); setError(''); setRefreshNotice('시트에서 최신 데이터를 불러오고 있어요.')
     try {
-      await api.requestSync()
-      setRefreshNotice('시트 데이터를 동기화하고 배포하는 중이에요. 완료되면 자동으로 반영됩니다.')
-      for (let attempt = 0; attempt < SYNC_POLL_LIMIT; attempt += 1) {
-        await new Promise(resolve => window.setTimeout(resolve, SYNC_POLL_INTERVAL_MS))
-        const next = await api.dashboard()
-        if (next.syncedAt && next.syncedAt !== previousSyncedAt) {
-          setData(next)
-          setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
-          setRefreshNotice('최신 시트 데이터가 대시보드에 반영됐어요.')
-          window.setTimeout(() => setRefreshNotice(''), 4000)
-          return
-        }
-      }
-      throw new Error('배포 완료를 기다리는 시간이 길어지고 있습니다. 잠시 후 다시 눌러 확인해 주세요.')
+      const next = await api.liveDashboard(data)
+      setData(next)
+      setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
+      setRefreshNotice('최신 시트 데이터가 바로 반영됐어요.')
+      window.setTimeout(() => setRefreshNotice(''), 4000)
     } catch (e) {
       setRefreshNotice(e instanceof Error ? e.message : '데이터 동기화를 시작하지 못했습니다.')
       window.setTimeout(() => setRefreshNotice(''), 6500)
@@ -209,7 +233,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const openings = useMemo(() => (data?.openings || []).filter(x => `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query])
   const selected = data?.openings.find(x => x.id === selectedId) || null
   const goHome = () => setSelectedId(REPORT_ID)
-  return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="GitHub Actions를 실행하고 새 시트 데이터가 배포되면 자동으로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '동기화·배포 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
+  return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="연동용 시트에서 최신 데이터를 읽어 현재 화면에 바로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '시트 불러오는 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
     <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
       <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
@@ -238,8 +262,8 @@ function OverviewReport({ data }: { data: DashboardData }) {
   }
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}>{project}</th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><b>{openingSituation(opening, note)}</b></td></tr> }) })}</tbody></table></div></article>
-    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 보고 문구</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>프로젝트 아래에 채용 직무, 채용 배경·TO, 현재 진행 순서로 정리됩니다. 문구는 아래에서 직접 수정할 수 있습니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 문구를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); const projectTargetTo = sorted.reduce((sum, opening) => sum + opening.targetTo, 0); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}><span>{project}</span><small>({projectTargetTo}명)</small></th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><b>{openingSituation(opening, note)}</b></td></tr> }) })}</tbody></table></div></article>
+    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 표 형식 리포트</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>채용 현황과 같은 프로젝트·채용 직무·목표 TO·채용 배경·현재 진행 표가 고정폭 형식으로 유지됩니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea slack-table-preview" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 표를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 표 복사</button></div></section></div>}
   </section>
 }
 

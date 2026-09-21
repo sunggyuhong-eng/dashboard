@@ -25,3 +25,4 @@
 .login-card>small{font-size:11px}
 @media(max-width:600px){.login-shell{padding:18px}.login-card{width:100%;max-width:460px;padding:34px 26px}}
 .topbar .sync-button:disabled{cursor:wait;opacity:.72}.topbar .sync-button.syncing{border-color:#b8d5fb;background:#f2f7ff;color:#1b64da}
+.project-status-table .project-cell{text-align:center;vertical-align:middle}.project-status-table .project-cell span,.project-status-table .project-cell small{display:block}.project-status-table .project-cell small{margin-top:7px;color:#6b7684;font-size:12px;font-weight:700}.slack-table-preview{font-family:Consolas,'Noto Sans Mono CJK KR','Courier New',monospace!important;font-size:12px!important;white-space:pre!important;overflow:auto!important}

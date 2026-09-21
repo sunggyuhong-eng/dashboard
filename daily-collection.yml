@@ -1,0 +1,49 @@
+name: Daily Collection
+
+on:
+  schedule:
+    # GitHub cron is UTC: 00:00 UTC = 09:00 Asia/Seoul; day 1 is reserved for monthly workflow.
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-write-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: .
+      # robots.txt 연결 실패 때만 사용하며, 명시적 Disallow 응답은 우회하지 않습니다.
+      ROBOTS_UNAVAILABLE_ALLOWED_HOSTS: www.gamejob.co.kr
+    steps:
+      - name: Skip the first day of month
+        id: calendar
+        run: echo "run=$([ "$(TZ=Asia/Seoul date +%d)" != '01' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        if: steps.calendar.outputs.run == 'true'
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        if: steps.calendar.outputs.run == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+      - if: steps.calendar.outputs.run == 'true'
+        run: pip install -r requirements.txt
+      - if: steps.calendar.outputs.run == 'true'
+        run: python scripts/run_pipeline.py --mode daily
+      - name: Commit daily snapshot
+        if: steps.calendar.outputs.run == 'true'
+        run: |
+          if [ -z "$(git status --porcelain -- data logs)" ]; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data logs
+          git commit -m "data: update daily hiring snapshot"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

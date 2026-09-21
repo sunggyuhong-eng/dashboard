@@ -1,0 +1,104 @@
+name: Generate GPT Report - OpenAI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: openai-report-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate-gpt-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.5' }}
+      PYTHONPATH: .
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify OpenAI API key
+        shell: bash
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::Repository Secret OPENAI_API_KEY가 없습니다. Settings > Secrets and variables > Actions에서 등록해 주세요."
+            exit 1
+          fi
+
+      - name: Generate GPT report from saved snapshots
+        run: python scripts/generate_existing_report.py
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Commit generated report
+        shell: bash
+        run: |
+          if [ -z "$(git status --porcelain -- data/reports reports)" ]; then
+            echo "::error::생성된 리포트 변경사항이 없습니다."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/reports reports
+          git commit -m "report: generate OpenAI GPT monthly analysis [skip ci]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Build website with generated report
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_RECRUITING_DASHBOARD_URL: ${{ vars.RECRUITING_DASHBOARD_URL }}
+      - name: Verify generated report is in website build
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("dist/data/reports/latest.json").read_text(encoding="utf-8"))
+          if report.get("status") != "complete":
+              raise SystemExit("배포본 리포트 상태가 complete가 아닙니다.")
+          if not report.get("analysis") and not report.get("markdown"):
+              raise SystemExit("배포본에 GPT 해설이 없습니다.")
+          pdf_path = report.get("pdf_path")
+          if not pdf_path or not Path("dist", pdf_path).exists():
+              raise SystemExit("배포본에 PDF 요약본이 없습니다.")
+          print(f"배포 확인: {report.get('period')} / {report.get('generated_at', '생성시각 없음')}")
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      - name: Deploy generated report to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

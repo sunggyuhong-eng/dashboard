@@ -1,0 +1,57 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'data/reports/**'
+      - 'reports/**'
+  workflow_run:
+    workflows: ["Monthly Collection", "Daily Collection", "Manual Collection"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Build PDF from saved report when available
+        run: |
+          pip install reportlab==4.2.5
+          python scripts/generate_saved_report_pdf.py
+      - uses: actions/setup-node@v7
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_RECRUITING_DASHBOARD_URL: ${{ vars.RECRUITING_DASHBOARD_URL }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: ./dist }
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

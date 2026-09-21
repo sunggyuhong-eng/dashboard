@@ -34,4 +34,5 @@ export type DashboardData = {
   openings: Opening[]
   syncedAt: string
   candidateCount: number
+  sheetApiUrl?: string
 }

@@ -1,7 +1,5 @@
 import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type PipelineStage } from './types'
 
-const sheetApiUrl = (import.meta.env.VITE_SHEET_API_URL || '').trim()
-
 type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; reason?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown }
 type SheetPayload = {
@@ -24,8 +22,8 @@ async function openingId(project: unknown, title: unknown) {
   return `sheet-${hex.slice(0, 16)}`
 }
 
-function readSheetJsonp(): Promise<SheetPayload> {
-  if (!sheetApiUrl) throw new Error('SHEET_API_URL Secret이 빌드에 연결되지 않았습니다. GitHub Actions를 다시 실행해 주세요.')
+function readSheetJsonp(sheetApiUrl: string): Promise<SheetPayload> {
+  if (!sheetApiUrl) throw new Error('배포 데이터에 시트 연결 주소가 없습니다. 최신 파일을 업로드한 뒤 GitHub Actions를 한 번 실행해 주세요.')
   return new Promise((resolve, reject) => {
     const callbackName = `kongSheetCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`
     const target = window as unknown as Record<string, unknown>
@@ -87,6 +85,7 @@ async function buildLiveDashboard(payload: SheetPayload, previous: DashboardData
     openings,
     candidateCount: openings.reduce((sum, opening) => sum + opening.candidates.length, 0),
     syncedAt: payload.syncedAt || new Date().toISOString(),
+    sheetApiUrl: previous?.sheetApiUrl || '',
   }
 }
 
@@ -100,6 +99,7 @@ export const api = {
   },
 
   async liveDashboard(previous: DashboardData | null): Promise<DashboardData> {
-    return buildLiveDashboard(await readSheetJsonp(), previous)
+    const endpoint = previous?.sheetApiUrl?.trim() || ''
+    return buildLiveDashboard(await readSheetJsonp(endpoint), previous)
   },
 }

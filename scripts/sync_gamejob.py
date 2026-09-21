@@ -109,6 +109,8 @@ def main() -> int:
         raise RuntimeError(sheet_data.get("error") or "연동용 사본의 공고 또는 지원자 데이터를 가져오지 못했습니다.")
 
     dashboard, unmatched = build_dashboard(sheet_data, load_previous_opening_ids())
+    # 읽기 전용 즉시 불러오기에 사용합니다. 이 URL은 기존 배포 JSON과 마찬가지로 공개됩니다.
+    dashboard["sheetApiUrl"] = endpoint
     if not dashboard["openings"]:
         raise RuntimeError("Dashboard_TO 탭에 표시할 공고가 없어 기존 배포 상태를 유지합니다.")
 

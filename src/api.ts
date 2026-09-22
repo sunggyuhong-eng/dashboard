@@ -1,4 +1,4 @@
-import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type PipelineStage } from './types'
+import { PIPELINE_STAGES, type Candidate, type DashboardData, type GamejobAnalyticsData, type Opening, type PipelineStage } from './types'
 
 type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; reason?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
@@ -104,5 +104,13 @@ export const api = {
   async liveDashboard(previous: DashboardData | null): Promise<DashboardData> {
     const endpoint = previous?.sheetApiUrl?.trim() || ''
     return buildLiveDashboard(await readSheetJsonp(endpoint), previous)
+  },
+
+  async gamejobAnalytics(): Promise<GamejobAnalyticsData> {
+    const response = await fetch(`${import.meta.env.BASE_URL}data/gamejob-applicants.json?t=${Date.now()}`, { cache: 'no-store' })
+    if (!response.ok) throw new Error('게임잡 지원자 추이 데이터를 찾지 못했습니다.')
+    const body = await response.json() as GamejobAnalyticsData
+    if (!Array.isArray(body.openings) || !Array.isArray(body.dailyApplications)) throw new Error('게임잡 지원자 추이 데이터 형식이 올바르지 않습니다.')
+    return body
   },
 }

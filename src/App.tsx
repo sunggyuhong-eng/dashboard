@@ -97,49 +97,6 @@ function openingSituation(opening: Opening, note: OpeningNote) {
   return memo ? `${status} · ${memo}` : status
 }
 
-function visualWidth(value: string) {
-  return Array.from(value).reduce((width, character) => width + (/[^\u0000-\u00ff]/.test(character) ? 2 : 1), 0)
-}
-
-function wrapTableCell(value: string, width: number) {
-  const source = value.replace(/[`\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() || '-'
-  const lines: string[] = []
-  let line = ''
-  for (const character of Array.from(source)) {
-    if (line && visualWidth(line + character) > width) {
-      lines.push(line.trimEnd())
-      line = ''
-    }
-    line += character
-  }
-  if (line || !lines.length) lines.push(line.trimEnd())
-  return lines
-}
-
-function padTableCell(value: string, width: number) {
-  return value + ' '.repeat(Math.max(0, width - visualWidth(value)))
-}
-
-function slackTable(openings: Opening[], notes: Map<string, OpeningNote>) {
-  const widths = [12, 22, 7, 26, 38]
-  const headers = ['프로젝트', '채용 직무', '목표 TO', '채용 배경', '현재 진행']
-  const rows = openings.map(opening => {
-    const project = projectName(opening)
-    return [project, roleName(opening, project), opening.targetTo ? `${opening.targetTo}명` : '미입력', opening.reason.trim() || '미입력', openingSituation(opening, notes.get(opening.id)!)]
-  })
-  const renderRow = (cells: string[]) => cells.map((cell, index) => padTableCell(cell, widths[index])).join(' | ')
-  const lines = [renderRow(headers), widths.map(width => '-'.repeat(width)).join('-+-')]
-  rows.forEach(row => {
-    const wrapped = row.map((cell, index) => wrapTableCell(cell, widths[index]))
-    const height = Math.max(...wrapped.map(cell => cell.length))
-    for (let line = 0; line < height; line += 1) {
-      lines.push(renderRow(wrapped.map(cell => cell[line] || '')))
-    }
-    lines.push(widths.map(width => '-'.repeat(width)).join('-+-'))
-  })
-  return lines.join('\n')
-}
-
 type InterviewEvent = {
   key: string
   date: Date
@@ -217,19 +174,17 @@ function createSlackReport(openings: Opening[]) {
     const project = projectName(opening)
     groups.set(project, [...(groups.get(project) || []), opening])
   })
-  const targetTo = openings.reduce((sum, opening) => sum + opening.targetTo, 0)
-  const candidateCount = openings.reduce((sum, opening) => sum + opening.candidates.length, 0)
   const today = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())
-  const lines = [
-    `*채용 진행 현황 | ${today}*`,
-    '━━━━━━━━━━━━━━━━━━━━',
-    `*전체 요약*  • 오픈 공고 \`${openings.length}개\`  • 목표 TO \`${targetTo ? `${targetTo}명` : '미입력'}\`  • 진행 지원자 \`${candidateCount}명\``,
-    '',
-  ]
-  const sorted = Array.from(groups.entries())
-    .sort(([a], [b]) => a.localeCompare(b, 'ko'))
-    .flatMap(([, projectOpenings]) => [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')))
-  lines.push('```', slackTable(sorted, notes), '```')
+  const lines = [`*채용 진행 현황 | ${today}*`, '']
+  Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).forEach(([project, projectOpenings], projectIndex) => {
+    if (projectIndex > 0) lines.push('', '────────────────────', '')
+    lines.push(`*${project}*`)
+    const sortedOpenings = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko'))
+    sortedOpenings.forEach(opening => {
+      const target = opening.targetTo ? `TO ${opening.targetTo}명` : 'TO 미입력'
+      lines.push(`• *${roleName(opening, project)} (${target})*: ${openingSituation(opening, notes.get(opening.id)!)}`)
+    })
+  })
   return lines.join('\n').trim()
 }
 
@@ -350,7 +305,7 @@ function OverviewReport({ data }: { data: DashboardData }) {
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
     <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); const projectTargetTo = sorted.reduce((sum, opening) => sum + opening.targetTo, 0); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}><span>{project}</span><small>({projectTargetTo}명)</small></th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><ProgressSituation opening={opening} note={note} /></td></tr> }) })}</tbody></table></div></article>
-    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 표 형식 리포트</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>채용 현황과 같은 프로젝트·채용 직무·목표 TO·채용 배경·현재 진행 표가 고정폭 형식으로 유지됩니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea slack-table-preview" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 표를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 표 복사</button></div></section></div>}
+    {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 채용 리포트</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>프로젝트별로 채용 직무, 목표 TO, 현재 진행사항만 간단하게 표시합니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 문구를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
   </section>
 }
 

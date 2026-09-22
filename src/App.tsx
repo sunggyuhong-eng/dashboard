@@ -74,11 +74,20 @@ function stageStatus(opening: Opening) {
     if (!count) return []
     const suffix = stage === '면접' ? `${count}명` : `${count}명 진행 중`
     const offerDates = stage === 'Offer'
-      ? stageCandidates.filter(candidate => candidate.hireDate).map(candidate => `${candidate.name}: ${candidate.hireDate} 입사 예정`)
+      ? stageCandidates.filter(candidate => candidate.hireDate).map(candidate => `${candidate.name}: ${formatKoreanDate(candidate.hireDate)} 입사 예정`)
       : []
     const offerDetail = offerDates.length ? ` (${offerDates.join(' · ')})` : ''
     return [`${labels[stage]} ${suffix}${offerDetail}`]
   })
+}
+
+function ProgressSituation({ opening, note }: { opening: Opening; note: OpeningNote }) {
+  const text = openingSituation(opening, note)
+  const match = text.match(/\([^)]*입사 예정[^)]*\)/)
+  if (!match || match.index == null) return <b>{text}</b>
+  const before = text.slice(0, match.index)
+  const after = text.slice(match.index + match[0].length)
+  return <b>{before}<strong className="overview-hire-date">{match[0]}</strong>{after}</b>
 }
 
 function openingSituation(opening: Opening, note: OpeningNote) {
@@ -153,6 +162,12 @@ function parseSheetDate(value?: string) {
   const parsed = new Date(year, month - 1, day)
   if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null
   return parsed
+}
+
+function formatKoreanDate(value?: string) {
+  const parsed = parseSheetDate(value)
+  if (!parsed) return (value || '').trim()
+  return new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(parsed)
 }
 
 function localDateKey(date: Date) {
@@ -334,7 +349,7 @@ function OverviewReport({ data }: { data: DashboardData }) {
   }
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); const projectTargetTo = sorted.reduce((sum, opening) => sum + opening.targetTo, 0); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}><span>{project}</span><small>({projectTargetTo}명)</small></th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><b>{openingSituation(opening, note)}</b></td></tr> }) })}</tbody></table></div></article>
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); const projectTargetTo = sorted.reduce((sum, opening) => sum + opening.targetTo, 0); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}><span>{project}</span><small>({projectTargetTo}명)</small></th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><ProgressSituation opening={opening} note={note} /></td></tr> }) })}</tbody></table></div></article>
     {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 표 형식 리포트</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>채용 현황과 같은 프로젝트·채용 직무·목표 TO·채용 배경·현재 진행 표가 고정폭 형식으로 유지됩니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea slack-table-preview" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 표를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 표 복사</button></div></section></div>}
   </section>
 }
@@ -357,7 +372,7 @@ function OpeningBoard({ opening }: { opening: Opening }) {
     <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${opening.targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${opening.hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${opening.candidates.length}명`} /></div>
     <div className="note-grid"><article className="reason-card"><span>채용 배경</span><p>{opening.reason || '채용 배경 미입력'}</p></article><article className="reason-card"><span>메모</span><p>{note.memo || '이 공고에 대한 메모를 입력해 주세요.'}</p></article></div>
     <div className="board-title"><div><span>HIRING PIPELINE</span><h2>전형 진행 현황</h2></div><p><Clock3 size={14} /> 선택한 전형과 실제 지원자가 있는 단계만 표시합니다.</p></div>
-    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><div className="candidate-name"><b>{candidate.name}</b>{candidate.stage === 'Offer' && candidate.hireDate && <strong className="hire-date">› {candidate.hireDate} 입사 예정</strong>}</div><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
+    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><div className="candidate-name"><b>{candidate.name}</b>{candidate.stage === 'Offer' && candidate.hireDate && <strong className="hire-date">› {formatKoreanDate(candidate.hireDate)} 입사 예정</strong>}</div><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
     {notice && <div className="toast">{notice}</div>}
     {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(false)}><section className="modal wide-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>LOCAL OPENING SETTINGS</span><h2>전형·메모</h2></div><button onClick={() => setEditing(false)}><X /></button></header><p className="local-help">목표 TO와 채용 배경은 연동용 사본의 Dashboard_TO 탭에서 불러옵니다. 전형 설정과 메모만 현재 브라우저에 저장됩니다.</p><fieldset className="stage-selector"><legend>사용 전형</legend><p>직무에 맞는 단계만 선택하세요. 실제 지원자가 있는 단계는 선택을 해제해도 화면에 유지됩니다.</p><div>{PIPELINE_STAGES.map(stage => <label key={stage}><input type="checkbox" checked={form.enabledStages.includes(stage)} onChange={() => toggleStage(stage)} /><span>{stage}</span></label>)}</div></fieldset><label>메모<textarea rows={3} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} /></label><div className="modal-actions"><button className="outline" onClick={() => setEditing(false)}>취소</button><button className="primary" onClick={save}>이 브라우저에 저장</button></div></section></div>}
   </section>

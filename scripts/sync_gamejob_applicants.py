@@ -146,24 +146,34 @@ def login(page: Page, user_id: str, password: str) -> None:
     except Exception:
         pass
     page.goto(MANAGE_URL, wait_until="domcontentloaded", timeout=60_000)
-    body = clean(page.locator("body").inner_text())
-    if "총 지원자" not in body and "채용공고" not in body:
-        raise RuntimeError("게임잡 기업회원 로그인에 실패했거나 추가 인증이 필요합니다.")
+    try:
+        page.get_by_text(re.compile(r"총\s*지원자")).first.wait_for(state="visible", timeout=20_000)
+    except Exception:
+        body = clean(page.locator("body").inner_text())
+        current_url = page.url
+        if "로그인" in body or "Login" in current_url:
+            raise RuntimeError("게임잡 기업회원 로그인에 실패했거나 추가 인증이 필요합니다.")
+        raise RuntimeError(f"게임잡 공고관리 화면은 열렸지만 총 지원자 영역이 나타나지 않았습니다. 현재 주소: {current_url}")
 
 
 CARD_SCRIPT = r"""
 () => {
   const result = [];
-  const anchors = Array.from(document.querySelectorAll('a'));
-  for (const anchor of anchors) {
-    const own = (anchor.innerText || '').replace(/\s+/g, ' ').trim();
-    const parentText = (anchor.parentElement?.innerText || '').replace(/\s+/g, ' ').trim();
-    if (!/^\[?\s*\d+\s*명\]?$/.test(own) || !/총\s*지원자/.test(parentText)) continue;
+  const seen = new Set();
+  const cells = Array.from(document.querySelectorAll('td')).filter(td => /총\s*지원자/.test(td.innerText || ''));
+  for (const cell of cells) {
+    const numericAnchors = Array.from(cell.querySelectorAll('a')).filter(anchor => {
+      const own = (anchor.innerText || '').replace(/[\[\]\s명]/g, '');
+      return /^\d+$/.test(own);
+    });
+    const anchor = numericAnchors[0];
+    if (!anchor || seen.has(anchor)) continue;
+    seen.add(anchor);
     let node = anchor;
     let card = null;
     while (node && node !== document.body) {
       const text = (node.innerText || '').replace(/\s+/g, ' ');
-      if (/등록일/.test(text) && /모집분야/.test(text) && /총\s*지원자/.test(text)) { card = node; break; }
+      if (/모집분야/.test(text) && /총\s*지원자/.test(text) && /채용시\s*마감/.test(text)) { card = node; break; }
       node = node.parentElement;
     }
     if (!card) continue;

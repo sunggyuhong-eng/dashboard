@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BarChart3, BriefcaseBusiness, Check, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
@@ -131,6 +131,70 @@ function slackTable(openings: Opening[], notes: Map<string, OpeningNote>) {
   return lines.join('\n')
 }
 
+type InterviewEvent = {
+  key: string
+  date: Date
+  project: string
+  candidate: string
+  opening: string
+  round: '1차' | '2차'
+}
+
+function parseSheetDate(value?: string) {
+  const source = (value || '').trim()
+  if (!source) return null
+  const numbers = source.match(/\d+/g)?.map(Number) || []
+  let year: number
+  let month: number
+  let day: number
+  if (numbers.length >= 3 && numbers[0] > 1900) [year, month, day] = numbers
+  else if (numbers.length >= 2) { year = new Date().getFullYear(); [month, day] = numbers }
+  else return null
+  const parsed = new Date(year, month - 1, day)
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null
+  return parsed
+}
+
+function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function InterviewCalendar({ openings }: { openings: Opening[] }) {
+  const [open, setOpen] = useState(false)
+  const events = useMemo(() => {
+    const result: InterviewEvent[] = []
+    openings.forEach(opening => {
+      const project = projectName(opening)
+      const role = roleName(opening, project)
+      opening.candidates.forEach(candidate => {
+        const schedules: Array<['1차' | '2차', string | undefined]> = [
+          ['1차', candidate.firstInterviewDate],
+          ['2차', candidate.secondInterviewDate],
+        ]
+        schedules.forEach(([round, value]) => {
+          const date = parseSheetDate(value)
+          if (!date) return
+          result.push({ key: `${candidate.id}-${round}-${localDateKey(date)}`, date, project, candidate: candidate.name, opening: role, round })
+        })
+      })
+    })
+    return result.sort((a, b) => a.date.getTime() - b.date.getTime() || a.candidate.localeCompare(b.candidate, 'ko'))
+  }, [openings])
+  const firstUpcoming = events.find(event => event.date.getTime() >= new Date().setHours(0, 0, 0, 0))
+  const [month, setMonth] = useState(() => {
+    const base = firstUpcoming?.date || new Date()
+    return new Date(base.getFullYear(), base.getMonth(), 1)
+  })
+  const todayKey = localDateKey(new Date())
+  const upcomingCount = events.filter(event => event.date.getTime() >= new Date().setHours(0, 0, 0, 0)).length
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1)
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+  const cells = Array.from({ length: 42 }, (_, index) => index - firstDay.getDay() + 1)
+  const monthLabel = `${month.getFullYear()}년 ${month.getMonth() + 1}월`
+  const moveMonth = (amount: number) => setMonth(current => new Date(current.getFullYear(), current.getMonth() + amount, 1))
+  return <><button className="calendar-fab" onClick={() => setOpen(value => !value)} aria-expanded={open}><CalendarDays size={18} /><span>면접 일정</span>{upcomingCount > 0 && <b>{upcomingCount}</b>}</button>{open && <section className="calendar-popover"><header><div><span>INTERVIEW CALENDAR</span><h2>면접 일정</h2></div><button onClick={() => setOpen(false)} aria-label="달력 닫기"><X size={19} /></button></header><div className="calendar-month"><button onClick={() => moveMonth(-1)} aria-label="이전 달"><ChevronLeft size={18} /></button><b>{monthLabel}</b><button onClick={() => moveMonth(1)} aria-label="다음 달"><ChevronRight size={18} /></button></div><div className="calendar-weekdays">{['일','월','화','수','목','금','토'].map(day => <span key={day}>{day}</span>)}</div><div className="calendar-grid">{cells.map((day, index) => { if (day < 1 || day > daysInMonth) return <div className="calendar-day empty" key={`empty-${index}`} />; const date = new Date(month.getFullYear(), month.getMonth(), day); const key = localDateKey(date); const dayEvents = events.filter(event => localDateKey(event.date) === key); return <article className={`calendar-day ${key === todayKey ? 'today' : ''}`} key={key}><span className="calendar-date">{day}</span><div className="calendar-events">{dayEvents.map(event => <div className={`calendar-event round-${event.round === '1차' ? 'one' : 'two'}`} key={event.key} title={`${event.opening} · ${event.round} 면접`}><b>{event.project}</b><span>{event.candidate}</span><em>{event.round}</em></div>)}</div></article> })}</div><footer className="calendar-legend"><span><i className="round-one" />1차 면접</span><span><i className="round-two" />2차 면접</span></footer></section>}</>
+}
+
 function createSlackReport(openings: Opening[]) {
   const notes = new Map(openings.map(opening => [opening.id, loadNote(opening)]))
   const groups = new Map<string, Opening[]>()
@@ -244,6 +308,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
       <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
+    {data && <InterviewCalendar openings={data.openings} />}
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
   </div>
 }

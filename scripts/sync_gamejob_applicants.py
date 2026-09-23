@@ -130,8 +130,56 @@ def extract_opening_title(text: str) -> str | None:
 
 
 def extract_total_applicants(text: str) -> int | None:
-    match = re.search(r"총\s*지원자\s*\[?\s*(\d+)\s*명?", clean(text))
-    return int(match.group(1)) if match else None
+    source = clean(text)
+    patterns = (
+        r"총\s*지원자\s*\[?\s*(\d+)\s*명?",
+        r"총\s*지원자[^0-9]{0,30}(\d+)\s*명?",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, source, flags=re.I)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def read_total_applicants(page: Page, timeout_ms: int = 30_000) -> int:
+    """느린 구형 페이지와 iframe을 고려해 지원자 수를 반복 탐색한다."""
+    deadline = time.monotonic() + timeout_ms / 1000
+    last_url = page.url
+    last_title = ""
+    last_body = ""
+    while time.monotonic() < deadline:
+        for frame in page.frames:
+            try:
+                locator = frame.locator(f"xpath={TOTAL_APPLICANTS_XPATH}")
+                if locator.count():
+                    raw = clean(locator.first.text_content() or locator.first.inner_text())
+                    direct = re.search(r"\d+", raw)
+                    if direct:
+                        return int(direct.group())
+
+                body_locator = frame.locator("body")
+                if body_locator.count():
+                    body = body_locator.inner_text()
+                    parsed = extract_total_applicants(body)
+                    if parsed is not None:
+                        return parsed
+                    if len(body) > len(last_body):
+                        last_body = clean(body)
+            except Exception:
+                continue
+        try:
+            last_url = page.url
+            last_title = page.title()
+        except Exception:
+            pass
+        page.wait_for_timeout(500)
+
+    preview = last_body[:400] or "본문 없음"
+    raise RuntimeError(
+        "총 지원자 수를 30초 동안 모든 프레임에서 찾지 못했습니다. "
+        f"현재 URL: {last_url} / 페이지 제목: {last_title or '제목 없음'} / 본문: {preview}"
+    )
 
 
 def load_opening_urls() -> list[str]:
@@ -315,16 +363,7 @@ def collect_opening(page: Page, url: str, collected_at: datetime) -> tuple[Openi
         if not title:
             raise RuntimeError(f"공고명 XPath와 페이지 문구에서 공고 제목을 찾지 못했습니다. 공고 주소: {url}")
 
-        total: int | None = None
-        total_locator = page.locator(f"xpath={TOTAL_APPLICANTS_XPATH}")
-        if total_locator.count():
-            try:
-                total = extract_total_applicants(f"총 지원자 {clean(total_locator.first.inner_text())}명")
-            except Exception:
-                total = None
-        total = total if total is not None else extract_total_applicants(body_text)
-        if total is None:
-            raise RuntimeError(f"총 지원자 수를 XPath와 페이지 문구에서 찾지 못했습니다. 공고 주소: {url}")
+        total = read_total_applicants(page)
 
         opening = OpeningSummary(id=stable_opening_id(title, url), title=title, project=project_from_title(title), total=total)
         if os.getenv("GAMEJOB_TOTAL_ONLY", "").strip().lower() in {"1", "true", "yes"}:

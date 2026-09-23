@@ -61,6 +61,11 @@ def test_applicant_page_text_fallbacks_ignore_non_application_dates():
     assert extract_application_dates(body, now) == ["2026-09-22", "2026-09-21"]
 
 
+def test_total_applicant_text_allows_legacy_table_spacing():
+    assert extract_total_applicants("온라인인재관리 총 지원자 [ 24 명 ] | 미열람 이력서 [24 명]") == 24
+    assert extract_total_applicants("총 지원자 : 24명") == 24
+
+
 def test_merge_uses_exact_dates_without_personal_information():
     opening = OpeningSummary(
         id="gamejob-1", title="[OTPS] 기획자", project="OTPS", total=2, unread=1,

@@ -118,6 +118,8 @@ Apps Script에는 `insertSheet`, `setValue`, `appendRow` 같은 쓰기 코드가
 
 게임잡 지원자 추이는 별도 `Sync Gamejob applicant analytics` Action이 매일 한국시간 오전 9시 10분에 실행됩니다. 최초 적용 직후에는 이 Action을 `Run workflow`로 한 번 실행해야 합니다. 정상 완료되면 집계 JSON 커밋이 생성되고 기존 Pages 배포 Action이 자동 실행됩니다.
 
+게임잡 로그인은 기업회원 전용 주소 `https://www.gamejob.co.kr/Login/Login_GI.asp`에서 바로 진행하며 별도의 `기업회원` 탭을 누르지 않습니다. 아이디는 `#lb_M_ID`, 비밀번호는 `#lb_M_PW`를 우선 사용합니다. 게임잡이 502·연결 거부 화면을 반환하면 최대 3회 재시도합니다. 그래도 실패하면 해당 Action 하단의 `Artifacts → gamejob-login-diagnostics`에 비밀번호를 제거한 화면·HTML·URL 진단 파일이 7일간 저장됩니다.
+
 수집 범위는 다음으로 제한됩니다.
 
 - 공고 제목·프로젝트·등록일·수정일·마감일

@@ -4,11 +4,18 @@ from datetime import datetime, timezone
 from scripts.sync_gamejob_applicants import (
     OpeningSummary,
     extract_application_dates,
+    is_transient_http_error,
     merge_data,
     normalize_application_date,
     parse_opening_text,
     project_from_title,
 )
+
+
+def test_gateway_page_is_not_treated_as_login_page():
+    assert is_transient_http_error(502, "") is True
+    assert is_transient_http_error(200, "502 Bad Gateway connection refused") is True
+    assert is_transient_http_error(200, "기업회원 로그인") is False
 
 
 def test_project_name_normalizes_octopus():

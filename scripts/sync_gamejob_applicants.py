@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -15,9 +16,8 @@ if TYPE_CHECKING:
     from playwright.sync_api import Locator, Page
 
 LOGIN_URL = "https://www.gamejob.co.kr/Login/Login_GI.asp"
-COMPANY_TAB_XPATH = "/html/body/div[2]/div[2]/form/fieldset/div/div[2]/div[1]/ul/li[2]/input"
-USER_XPATH = "/html/body/div/div/div[2]/form/fieldset/div/div[2]/div[2]/input[1]"
-PASSWORD_XPATH = "/html/body/div/div/div[2]/form/fieldset/div/div[2]/div[2]/input[2]"
+USER_XPATH = '//*[@id="lb_M_ID"]'
+PASSWORD_XPATH = '//*[@id="lb_M_PW"]'
 LOGIN_BUTTON_XPATH = "/html/body/div/div/div[2]/form/fieldset/div/div[2]/div[2]/button"
 OPENING_TITLE_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[3]/tbody/tr[2]/td/table/tbody/tr/td/a/font"
 TOTAL_APPLICANTS_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[5]/tbody/tr[4]/td[1]/a[1]/b/u"
@@ -27,6 +27,7 @@ KST = timezone(timedelta(hours=9))
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config" / "gamejob-opening-urls.json"
 OUTPUT = ROOT / "public" / "data" / "gamejob-applicants.json"
+DEBUG_DIR = ROOT / "tmp" / "gamejob-debug"
 
 
 @dataclass
@@ -129,47 +130,104 @@ def load_opening_urls() -> list[str]:
     return list(dict.fromkeys(urls))
 
 
+def is_transient_http_error(status: int, body: str) -> bool:
+    text = clean(body).lower()
+    return status >= 500 or any(marker in text for marker in ("bad gateway", "connection refused", "service unavailable", "gateway timeout"))
+
+
 def navigate(page: Page, url: str, label: str) -> None:
     last_error: Exception | None = None
-    for attempt in range(1, 3):
+    for attempt in range(1, 4):
         try:
-            page.goto(url, wait_until="commit", timeout=30_000)
-            page.wait_for_timeout(1_500)
-            if page.locator("body").count():
+            response = page.goto(url, wait_until="commit", timeout=30_000)
+            page.wait_for_timeout(2_000)
+            body = clean(page.locator("body").inner_text()) if page.locator("body").count() else ""
+            status = response.status if response else 0
+            error_page = is_transient_http_error(status, body)
+            if error_page:
+                raise RuntimeError(f"HTTP {status or '오류'}: {body[:160]}")
+            if body:
                 return
         except Exception as error:
             last_error = error
             try:
-                if page.url not in {"", "about:blank"} and page.locator("body").count() and clean(page.locator("body").inner_text()):
+                body = clean(page.locator("body").inner_text()) if page.locator("body").count() else ""
+                known_error = is_transient_http_error(0, body)
+                if page.url not in {"", "about:blank"} and body and not known_error:
                     return
             except Exception:
                 pass
-        if attempt < 2:
-            page.wait_for_timeout(3_000)
-    raise RuntimeError(f"게임잡 {label} 페이지가 GitHub Actions 실행 서버에 응답하지 않았습니다. 주소: {url} / 오류: {type(last_error).__name__ if last_error else '응답 없음'}")
+        if attempt < 3:
+            page.wait_for_timeout(attempt * 4_000)
+    detail = clean(str(last_error))[:240] if last_error else "응답 없음"
+    raise RuntimeError(f"게임잡 {label} 페이지가 3회 연속 정상 응답하지 않았습니다. 주소: {url} / 오류: {detail}")
 
 
-def first_visible(locators: list[Any]) -> Any:
-    for locator in locators:
-        try:
-            if locator.count() and locator.first.is_visible():
-                return locator.first
-        except Exception:
-            continue
-    raise RuntimeError("게임잡 로그인 입력 요소를 찾지 못했습니다.")
+def first_visible(page: Page, locators: list[Any], label: str, timeout_ms: int = 15_000) -> Any:
+    """느린 렌더링을 고려해 후보 선택자 중 화면에 보이는 첫 요소를 기다린다."""
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        for locator in locators:
+            try:
+                if locator.count() and locator.first.is_visible():
+                    return locator.first
+            except Exception:
+                continue
+        page.wait_for_timeout(250)
+    raise RuntimeError(f"게임잡 로그인 화면에서 {label} 요소를 찾지 못했습니다.")
+
+
+def save_debug(page: Page, phase: str, secrets: tuple[str, ...] = ()) -> None:
+    """실패 당시 URL·화면·HTML을 남기되 계정정보는 제거한다."""
+    DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+    safe_phase = re.sub(r"[^0-9A-Za-z_-]", "-", phase)
+    try:
+        page.screenshot(path=str(DEBUG_DIR / f"{safe_phase}.png"), full_page=True)
+    except Exception:
+        pass
+    try:
+        html = page.content()
+        body = clean(page.locator("body").inner_text())[:800]
+        for secret in secrets:
+            if secret:
+                html = html.replace(secret, "[REDACTED]")
+                body = body.replace(secret, "[REDACTED]")
+        (DEBUG_DIR / f"{safe_phase}.html").write_text(html, encoding="utf-8")
+        (DEBUG_DIR / f"{safe_phase}.txt").write_text(
+            f"URL: {page.url}\nTITLE: {page.title()}\nBODY: {body}\n",
+            encoding="utf-8",
+        )
+        print(f"게임잡 진단 파일 저장: {DEBUG_DIR}")
+    except Exception:
+        pass
 
 
 def login(page: Page, user_id: str, password: str) -> None:
-    navigate(page, LOGIN_URL, "로그인")
-    company = first_visible([page.locator(f"xpath={COMPANY_TAB_XPATH}"), page.locator('input[value*="기업"]')])
-    company.click()
-    user = first_visible([page.locator(f"xpath={USER_XPATH}"), page.locator('input[type="text"]')])
-    secret = first_visible([page.locator(f"xpath={PASSWORD_XPATH}"), page.locator('input[type="password"]')])
-    button = first_visible([page.locator(f"xpath={LOGIN_BUTTON_XPATH}"), page.get_by_role("button", name=re.compile("로그인"))])
-    user.fill(user_id)
-    secret.fill(password)
-    button.click(no_wait_after=True)
-    page.wait_for_timeout(3_000)
+    try:
+        navigate(page, LOGIN_URL, "로그인")
+        # Login_GI.asp 자체가 기업회원 로그인 화면이므로 별도 회원 탭을 누르지 않는다.
+        user = first_visible(page, [
+            page.locator("#lb_M_ID"), page.locator(f"xpath={USER_XPATH}"),
+            page.locator('input[name="M_ID"]'), page.locator('input[type="text"]'),
+        ], "아이디 입력")
+        secret = first_visible(page, [
+            page.locator("#lb_M_PW"), page.locator(f"xpath={PASSWORD_XPATH}"),
+            page.locator('input[name="M_PW"]'), page.locator('input[type="password"]'),
+        ], "비밀번호 입력")
+        button = first_visible(page, [
+            page.locator(f"xpath={LOGIN_BUTTON_XPATH}"),
+            page.get_by_role("button", name=re.compile("로그인")),
+            page.locator('button[type="submit"]'), page.locator('input[type="submit"]'),
+        ], "로그인 버튼")
+        user.fill(user_id)
+        secret.fill(password)
+        button.click(no_wait_after=True)
+        page.wait_for_timeout(3_000)
+        if "Login_GI.asp" in page.url and user.is_visible():
+            raise RuntimeError("게임잡 로그인 후에도 로그인 화면에 머물러 있습니다. 아이디·비밀번호 또는 추가 인증 여부를 확인해 주세요.")
+    except Exception:
+        save_debug(page, "login-failure", (user_id, password))
+        raise
 
 
 def read_text(locator: Locator, label: str, url: str) -> str:

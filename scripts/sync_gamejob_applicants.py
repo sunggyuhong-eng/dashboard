@@ -20,7 +20,7 @@ USER_XPATH = '//*[@id="lb_M_ID"]'
 PASSWORD_XPATH = '//*[@id="lb_M_PW"]'
 LOGIN_BUTTON_XPATH = "/html/body/div/div/div[2]/form/fieldset/div/div[2]/div[2]/button"
 OPENING_TITLE_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[3]/tbody/tr[2]/td/table/tbody/tr/td/a/font"
-TOTAL_APPLICANTS_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[5]/tbody/tr[4]/td[1]/a[1]/b/u"
+TOTAL_APPLICANTS_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[4]/tbody/tr[3]/td[2]/table/tbody/tr/td[3]/table/tbody/tr[3]/td/a[1]/b/font[2]"
 APPLICATION_DATE_CELLS_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[6]/tbody/tr/td[3]"
 PAGINATION_FONTS_XPATH = "/html/body/div/table/tbody/tr/td/table[1]/tbody/tr/td[5]/form/table[7]/tbody/tr[3]/td/a/font"
 KST = timezone(timedelta(hours=9))
@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config" / "gamejob-opening-urls.json"
 OUTPUT = ROOT / "public" / "data" / "gamejob-applicants.json"
 DEBUG_DIR = ROOT / "tmp" / "gamejob-debug"
+KNOWN_OPENING_TITLES = {
+    "285135": "[Project octopus] 시스템 기획자 모집 (경력 2년 이상)",
+}
 
 
 @dataclass
@@ -107,8 +110,28 @@ def normalize_application_date(value: str, collected_at: datetime) -> str | None
 
 
 def extract_application_dates(text: str, collected_at: datetime) -> list[str]:
-    values = re.findall(r"(?:\[지원일]\s*)?(Today|오늘|\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{1,2}[-./]\d{1,2})", text, flags=re.I)
+    # 페이지 전체 문구를 읽을 때 등록일·마감일을 지원일로 오인하지 않도록
+    # 반드시 [지원일] 표기가 붙은 날짜만 사용한다.
+    values = re.findall(r"\[지원일]\s*(Today|오늘|\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{1,2}[-./]\d{1,2})", text, flags=re.I)
     return [date for value in values if (date := normalize_application_date(value, collected_at))]
+
+
+def extract_opening_title(text: str) -> str | None:
+    source = str(text or "").replace("\r", "\n")
+    patterns = (
+        r"(\[(?!지원일])[^]\n]+]\s*[^\n]+?)(?:\s*\(채용시 마감\)|\s*$)",
+        r"(\[(?!지원일])[^]\n]+]\s*[^\n]+?)(?=\s*모집분야\s*[:：])",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, source, flags=re.I | re.M)
+        if match:
+            return clean(match.group(1))
+    return None
+
+
+def extract_total_applicants(text: str) -> int | None:
+    match = re.search(r"총\s*지원자\s*\[?\s*(\d+)\s*명?", clean(text))
+    return int(match.group(1)) if match else None
 
 
 def load_opening_urls() -> list[str]:
@@ -245,7 +268,10 @@ def collect_dates_on_page(page: Page, collected_at: datetime) -> list[str]:
         value = normalize_application_date(cells.nth(index).inner_text(), collected_at)
         if value:
             dates.append(value)
-    return dates
+    if dates:
+        return dates
+    # 테이블 위치가 바뀐 경우 [지원일] 표기만 페이지 전체에서 읽는다.
+    return extract_application_dates(page.locator("body").inner_text(), collected_at)
 
 
 def move_to_applicant_page(page: Page, page_number: int, opening_url: str) -> None:
@@ -257,28 +283,61 @@ def move_to_applicant_page(page: Page, page_number: int, opening_url: str) -> No
             target = font.locator("xpath=parent::a")
             break
     if target is None:
+        links = page.get_by_role("link", name=str(page_number), exact=True)
+        for index in range(links.count()):
+            if links.nth(index).is_visible():
+                target = links.nth(index)
+                break
+    if target is None:
         raise RuntimeError(f"지원자 목록 {page_number}페이지 링크를 찾지 못했습니다. 공고 주소: {opening_url}")
     target.click(no_wait_after=True)
     page.wait_for_timeout(2_000)
 
 
 def collect_opening(page: Page, url: str, collected_at: datetime) -> tuple[OpeningSummary, Counter[str], bool]:
-    navigate(page, url, "지원자 관리")
-    if "Login" in page.url or "로그인" in clean(page.locator("body").inner_text())[:200]:
-        raise RuntimeError("게임잡 로그인이 유지되지 않아 지원자 관리 화면으로 이동하지 못했습니다.")
-    title = read_text(page.locator(f"xpath={OPENING_TITLE_XPATH}"), "공고명", url)
-    total_text = read_text(page.locator(f"xpath={TOTAL_APPLICANTS_XPATH}"), "총 지원자 수", url)
-    total_match = re.search(r"\d+", total_text)
-    if not total_match:
-        raise RuntimeError(f"총 지원자 수에서 숫자를 읽지 못했습니다. 표시값: {total_text}")
-    total = int(total_match.group())
-    opening = OpeningSummary(id=stable_opening_id(title, url), title=title, project=project_from_title(title), total=total)
-    dates = collect_dates_on_page(page, collected_at)
-    pages = max(1, (total + 9) // 10)
-    for page_number in range(2, pages + 1):
-        move_to_applicant_page(page, page_number, url)
-        dates.extend(collect_dates_on_page(page, collected_at))
-    return opening, Counter(dates), total == 0 or len(dates) >= total
+    opening_number = parse_qs(urlparse(url).query).get("GI_No", ["unknown"])[0]
+    try:
+        navigate(page, url, "지원자 관리")
+        body_text = page.locator("body").inner_text()
+        if "Login" in page.url or "로그인" in clean(body_text)[:200]:
+            raise RuntimeError("게임잡 로그인이 유지되지 않아 지원자 관리 화면으로 이동하지 못했습니다.")
+
+        # 최초 검증 대상은 공개 공고의 제목을 고정 연결한다. 지원자 관리 화면의
+        # 구형 테이블 구조가 바뀌어도 총 지원자 수 XPath 검증을 계속할 수 있다.
+        title: str | None = KNOWN_OPENING_TITLES.get(opening_number)
+        title_locator = page.locator(f"xpath={OPENING_TITLE_XPATH}")
+        if not title and title_locator.count():
+            try:
+                title = clean(title_locator.first.inner_text())
+            except Exception:
+                title = None
+        title = title or extract_opening_title(body_text)
+        if not title:
+            raise RuntimeError(f"공고명 XPath와 페이지 문구에서 공고 제목을 찾지 못했습니다. 공고 주소: {url}")
+
+        total: int | None = None
+        total_locator = page.locator(f"xpath={TOTAL_APPLICANTS_XPATH}")
+        if total_locator.count():
+            try:
+                total = extract_total_applicants(f"총 지원자 {clean(total_locator.first.inner_text())}명")
+            except Exception:
+                total = None
+        total = total if total is not None else extract_total_applicants(body_text)
+        if total is None:
+            raise RuntimeError(f"총 지원자 수를 XPath와 페이지 문구에서 찾지 못했습니다. 공고 주소: {url}")
+
+        opening = OpeningSummary(id=stable_opening_id(title, url), title=title, project=project_from_title(title), total=total)
+        if os.getenv("GAMEJOB_TOTAL_ONLY", "").strip().lower() in {"1", "true", "yes"}:
+            return opening, Counter(), False
+        dates = collect_dates_on_page(page, collected_at)
+        pages = max(1, (total + 9) // 10)
+        for page_number in range(2, pages + 1):
+            move_to_applicant_page(page, page_number, url)
+            dates.extend(collect_dates_on_page(page, collected_at))
+        return opening, Counter(dates), total == 0 or len(dates) >= total
+    except Exception:
+        save_debug(page, f"opening-{opening_number}-failure")
+        raise
 
 
 def load_existing() -> dict[str, Any]:
@@ -338,9 +397,15 @@ def main() -> int:
             opening, counts, complete = collect_opening(page, url, collected_at)
             openings.append(opening)
             exact_dates[opening.id] = counts
-            print(f"[{index}/{len(urls)}] {opening.title}: 총 {opening.total}명 / 지원일 {sum(counts.values())}건 / 완전={complete}")
+            if os.getenv("GAMEJOB_TOTAL_ONLY", "").strip().lower() in {"1", "true", "yes"}:
+                print(f"[{index}/{len(urls)}] 공고명: {opening.title} / 총 지원자 수: {opening.total}명")
+            else:
+                print(f"[{index}/{len(urls)}] {opening.title}: 총 {opening.total}명 / 지원일 {sum(counts.values())}건 / 완전={complete}")
         context.close()
         browser.close()
+    if os.getenv("GAMEJOB_TOTAL_ONLY", "").strip().lower() in {"1", "true", "yes"}:
+        print("게임잡 단일 공고의 총 지원자 수 확인을 완료했습니다. 기존 통계 파일은 변경하지 않습니다.")
+        return 0
     data = merge_data(load_existing(), openings, exact_dates, collected_at)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

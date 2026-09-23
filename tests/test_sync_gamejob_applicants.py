@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from scripts.sync_gamejob_applicants import (
     OpeningSummary,
     extract_application_dates,
+    extract_opening_title,
+    extract_total_applicants,
     is_transient_http_error,
     merge_data,
     normalize_application_date,
@@ -43,6 +45,20 @@ def test_application_dates_support_today_and_month_day():
     text = "[지원일] Today\n[지원일] 09/21\n[지원일] 2026-09-20"
     assert extract_application_dates(text, now) == ["2026-09-22", "2026-09-21", "2026-09-20"]
     assert normalize_application_date("12/31", now) == "2025-12-31"
+
+
+def test_applicant_page_text_fallbacks_ignore_non_application_dates():
+    now = datetime(2026, 9, 22, 3, 0, tzinfo=timezone.utc)
+    body = """
+    등록일 : 2026-09-21 | 수정일 : 2026-09-22 | 마감일 : 2026-12-20
+    [Project octopus] 시스템 기획자 모집 (경력 2년 이상) (채용시 마감)
+    총 지원자 [20 명] | 미열람 이력서 [20 명]
+    [지원일] Today
+    [지원일] 09/21
+    """
+    assert extract_opening_title(body) == "[Project octopus] 시스템 기획자 모집 (경력 2년 이상)"
+    assert extract_total_applicants(body) == 20
+    assert extract_application_dates(body, now) == ["2026-09-22", "2026-09-21"]
 
 
 def test_merge_uses_exact_dates_without_personal_information():

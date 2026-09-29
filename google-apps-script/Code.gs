@@ -96,9 +96,73 @@ function dashboard_() {
     ok: true,
     openings: openings,
     candidates: candidates,
+    applications: applicationRows_(ss),
     hiredCounts: hiredCounts,
     syncedAt: new Date().toISOString()
   };
+}
+
+// GmailSync.gs가 만든 지원자_추이 탭을 읽기 전용으로 전달합니다.
+// 지원자 이름·이메일·전화번호·메일 ID는 API 응답에 포함하지 않습니다.
+function applicationRows_(ss) {
+  var sheet = findSheet_(ss, ['지원자_추이']);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  var table = applicationTable_(sheet);
+  var columns = table.columns;
+  var timezone = ss.getSpreadsheetTimeZone();
+  var rows = [];
+
+  for (var i = table.headerRow; i < table.values.length; i++) {
+    var displayRow = table.values[i];
+    var rawRow = table.rawValues[i] || [];
+    var source = clean_(displayRow[columns.source]);
+    var project = clean_(displayRow[columns.project]);
+    var title = clean_(displayRow[columns.title]);
+    var date = applicationDate_(rawRow[columns.date], displayRow[columns.date], timezone);
+    if (!date || !source || !title) continue;
+    rows.push({
+      date: date,
+      source: source,
+      project: project,
+      openingTitle: title
+    });
+  }
+  return rows;
+}
+
+function applicationTable_(sheet) {
+  var range = sheet.getDataRange();
+  var values = range.getDisplayValues();
+  var rawValues = range.getValues();
+  var aliases = {
+    date: ['지원일시', '지원일', '수신일시', '메일일시', '날짜'],
+    source: ['지원경로', '지원 경로', '지원채널', '지원 채널', '채널', '출처'],
+    project: ['프로젝트', '프로젝트명', '프로젝트 명', 'PJ'],
+    title: ['공고명', '채용공고', '채용공고 제목', '직무(공고명)']
+  };
+  for (var r = 0; r < Math.min(values.length, 20); r++) {
+    var columns = {};
+    values[r].forEach(function(value, index) {
+      var header = clean_(value);
+      Object.keys(aliases).forEach(function(key) {
+        if (aliases[key].indexOf(header) >= 0) columns[key] = index;
+      });
+    });
+    if (columns.date != null && columns.source != null && columns.project != null && columns.title != null) {
+      return { values: values, rawValues: rawValues, headerRow: r + 1, columns: columns };
+    }
+  }
+  throw new Error(sheet.getName() + ' 시트에서 지원일시, 지원경로, 프로젝트, 공고명 헤더를 찾지 못했습니다.');
+}
+
+function applicationDate_(raw, display, timezone) {
+  if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw.getTime())) {
+    return Utilities.formatDate(raw, timezone || Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  var match = clean_(display).match(/(\d{4})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})/);
+  if (!match) return '';
+  return match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2);
 }
 
 function openingTable_(sheet) {

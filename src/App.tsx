@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { BarChart3, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, TrendingUp, UsersRound, X } from 'lucide-react'
 import { api } from './api'
-import { PIPELINE_STAGES, type DashboardData, type GamejobAnalyticsData, type Opening, type PipelineStage } from './types'
+import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
 type OpeningNote = {
   memo: string
@@ -277,65 +277,80 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const goHome = () => setSelectedId(REPORT_ID)
   const goAnalytics = () => setSelectedId(ANALYTICS_ID)
   return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="연동용 시트에서 최신 데이터를 읽어 현재 화면에 바로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '시트 불러오는 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
-    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><button className={`report-link analytics-link ${selectedId === ANALYTICS_ID ? 'active' : ''}`} onClick={goAnalytics}><TrendingUp size={17} /><div><b>지원자 추이</b><small>게임잡 일별 지원 현황</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
-      <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selectedId === ANALYTICS_ID ? <ApplicantAnalytics /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
+    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><button className={`report-link analytics-link ${selectedId === ANALYTICS_ID ? 'active' : ''}`} onClick={goAnalytics}><TrendingUp size={17} /><div><b>지원자 추이</b><small>게임잡·그리팅 지원 현황</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
+      <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selectedId === ANALYTICS_ID && data ? <ApplicantAnalytics data={data} /> : selected ? <OpeningBoard opening={selected} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
     {data && <InterviewCalendar openings={data.openings} />}
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
   </div>
 }
 
-function ApplicantAnalytics() {
-  const [analytics, setAnalytics] = useState<GamejobAnalyticsData | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+function ApplicantAnalytics({ data }: { data: DashboardData }) {
   const [days, setDays] = useState('30')
+  const [source, setSource] = useState('전체')
   const [project, setProject] = useState('전체')
   const [openingId, setOpeningId] = useState('전체')
-  useEffect(() => {
-    setLoading(true)
-    api.gamejobAnalytics().then(setAnalytics).catch(reason => setError(reason instanceof Error ? reason.message : '지원자 추이 데이터를 불러오지 못했습니다.')).finally(() => setLoading(false))
-  }, [])
-  const projects = useMemo(() => Array.from(new Set((analytics?.openings || []).map(item => item.project))).sort((a, b) => a.localeCompare(b, 'ko')), [analytics])
-  const availableOpenings = useMemo(() => (analytics?.openings || []).filter(item => project === '전체' || item.project === project), [analytics, project])
+  const sources = useMemo(() => Array.from(new Set(data.applications.map(item => item.source))).sort((a, b) => a.localeCompare(b, 'ko')), [data.applications])
+  const sourceRows = useMemo(() => data.applications.filter(item => source === '전체' || item.source === source), [data.applications, source])
+  const projects = useMemo(() => Array.from(new Set(sourceRows.map(item => item.project))).sort((a, b) => a.localeCompare(b, 'ko')), [sourceRows])
+  useEffect(() => { if (project !== '전체' && !projects.includes(project)) setProject('전체') }, [project, projects])
+  const projectRows = useMemo(() => sourceRows.filter(item => project === '전체' || item.project === project), [sourceRows, project])
+  const availableOpenings = useMemo(() => {
+    const map = new Map<string, { id: string; project: string; title: string }>()
+    projectRows.forEach(item => {
+      const id = `${item.project}\u001f${item.openingTitle}`
+      if (!map.has(id)) map.set(id, { id, project: item.project, title: item.openingTitle })
+    })
+    return Array.from(map.values()).sort((a, b) => `${a.project}\u001f${a.title}`.localeCompare(`${b.project}\u001f${b.title}`, 'ko'))
+  }, [projectRows])
   useEffect(() => { if (openingId !== '전체' && !availableOpenings.some(item => item.id === openingId)) setOpeningId('전체') }, [availableOpenings, openingId])
   const view = useMemo(() => {
-    if (!analytics) return null
     const allowed = new Set(availableOpenings.filter(item => openingId === '전체' || item.id === openingId).map(item => item.id))
-    const latest = analytics.dailyApplications.reduce((max, item) => item.date > max ? item.date : max, '')
+    const allRows = projectRows.filter(item => allowed.has(`${item.project}\u001f${item.openingTitle}`))
+    const latest = allRows.reduce((max, item) => item.date > max ? item.date : max, '')
     const latestDate = latest ? new Date(`${latest}T00:00:00`) : new Date()
     const from = days === 'all' ? '' : localDateKey(new Date(latestDate.getFullYear(), latestDate.getMonth(), latestDate.getDate() - Number(days) + 1))
-    const rows = analytics.dailyApplications.filter(item => allowed.has(item.openingId) && (!from || item.date >= from))
+    const rows = allRows.filter(item => !from || item.date >= from)
     const byDate = new Map<string, number>()
     const byOpening = new Map<string, number>()
-    rows.forEach(item => { byDate.set(item.date, (byDate.get(item.date) || 0) + item.count); byOpening.set(item.openingId, (byOpening.get(item.openingId) || 0) + item.count) })
+    rows.forEach(item => {
+      const id = `${item.project}\u001f${item.openingTitle}`
+      byDate.set(item.date, (byDate.get(item.date) || 0) + 1)
+      byOpening.set(id, (byOpening.get(id) || 0) + 1)
+    })
     const dates = Array.from(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count }))
-    const openingRows = availableOpenings.filter(item => allowed.has(item.id)).map(item => ({ ...item, periodCount: byOpening.get(item.id) || 0 })).sort((a, b) => b.periodCount - a.periodCount || b.currentTotal - a.currentTotal)
-    return { dates, openingRows, total: rows.reduce((sum, item) => sum + item.count, 0), from, latest }
-  }, [analytics, availableOpenings, openingId, days])
-  if (loading) return <Loading label="게임잡 지원자 추이를 불러오는 중이에요" />
-  if (error) return <ErrorState message={error} retry={() => window.location.reload()} />
-  if (!analytics || !analytics.openings.length) return <section className="analytics-view"><div className="analytics-head"><div><span className="eyebrow">APPLICANT ANALYTICS</span><h1>지원자 추이</h1><p>게임잡 자동 수집이 완료되면 날짜별 지원 현황이 표시됩니다.</p></div></div><div className="analytics-empty"><TrendingUp size={28} /><b>아직 수집된 게임잡 데이터가 없습니다</b><span>GitHub Actions의 ‘Sync Gamejob applicant analytics’를 처음 한 번 실행해 주세요.</span></div></section>
+    const openingRows = availableOpenings.filter(item => allowed.has(item.id)).map(item => {
+      const matching = allRows.filter(row => `${row.project}\u001f${row.openingTitle}` === item.id)
+      const channels = Array.from(new Set(matching.map(row => row.source))).sort((a, b) => a.localeCompare(b, 'ko')).join(' · ')
+      return { ...item, periodCount: byOpening.get(item.id) || 0, currentTotal: matching.length, channels }
+    }).sort((a, b) => b.periodCount - a.periodCount || b.currentTotal - a.currentTotal)
+    const first = allRows.reduce((min, item) => !min || item.date < min ? item.date : min, '')
+    const spanDays = days === 'all' && first && latest
+      ? Math.max(1, Math.round((new Date(`${latest}T00:00:00`).getTime() - new Date(`${first}T00:00:00`).getTime()) / 86_400_000) + 1)
+      : Math.max(1, Number(days) || 1)
+    return { dates, openingRows, total: rows.length, currentTotal: allRows.length, from, latest, spanDays }
+  }, [availableOpenings, openingId, projectRows, days])
+  if (!data.applications.length) return <section className="analytics-view"><div className="analytics-head"><div><span className="eyebrow">APPLICANT ANALYTICS</span><h1>지원자 추이</h1><p>게임잡·그리팅 지원 알림을 날짜별로 확인합니다.</p></div></div><div className="analytics-empty"><TrendingUp size={28} /><b>아직 수집된 지원 알림이 없습니다</b><span>지원자_추이 시트에 데이터가 들어오면 이 화면에 바로 표시됩니다.</span></div></section>
   const dates = view?.dates || []
   const maxValue = Math.max(1, ...dates.map(item => item.count))
   const width = 900; const height = 250; const padX = 42; const padY = 28
   const points = dates.map((item, index) => ({ ...item, x: dates.length === 1 ? width / 2 : padX + index * ((width - padX * 2) / (dates.length - 1)), y: height - padY - (item.count / maxValue) * (height - padY * 2) }))
   const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ')
   const total = view?.total || 0
-  const average = dates.length ? total / dates.length : 0
-  const currentTotal = (view?.openingRows || []).reduce((sum, item) => sum + item.currentTotal, 0)
+  const average = total / Math.max(1, view?.spanDays || 1)
+  const currentTotal = view?.currentTotal || 0
   const topRows = (view?.openingRows || []).slice(0, 6)
   const donutTotal = Math.max(1, topRows.reduce((sum, item) => sum + item.periodCount, 0))
   const colors = ['#1b64da', '#3182f6', '#67a5f6', '#8bbdf9', '#a69af4', '#c5baf7']
   let angle = 0
   const stops = topRows.map((item, index) => { const start = angle; angle += (item.periodCount / donutTotal) * 360; return `${colors[index]} ${start}deg ${angle}deg` })
   const formatShortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
-  return <section className="analytics-view"><div className="analytics-head"><div><span className="eyebrow">APPLICANT ANALYTICS</span><h1>지원자 추이</h1><p>게임잡 공고별 지원 유입을 날짜 기준으로 확인합니다.</p></div><div className="analytics-updated"><RefreshCw size={15} /><span>마지막 수집<b>{analytics.syncedAt ? new Date(analytics.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div></div>
-    <div className="analytics-filters"><label>기간<select value={days} onChange={event => setDays(event.target.value)}><option value="7">최근 7일</option><option value="30">최근 30일</option><option value="90">최근 90일</option><option value="all">전체 기간</option></select></label><label>프로젝트<select value={project} onChange={event => setProject(event.target.value)}><option>전체</option>{projects.map(item => <option key={item}>{item}</option>)}</select></label><label>채용 직무<select value={openingId} onChange={event => setOpeningId(event.target.value)}><option value="전체">전체 공고</option>{availableOpenings.map(item => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label></div>
+  return <section className="analytics-view"><div className="analytics-head"><div><span className="eyebrow">APPLICANT ANALYTICS</span><h1>지원자 추이</h1><p>게임잡·그리팅 지원 알림을 날짜와 공고 기준으로 확인합니다.</p></div><div className="analytics-updated"><RefreshCw size={15} /><span>마지막 수집<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div></div>
+    <div className="analytics-filters"><label>기간<select value={days} onChange={event => setDays(event.target.value)}><option value="7">최근 7일</option><option value="30">최근 30일</option><option value="90">최근 90일</option><option value="all">전체 기간</option></select></label><label>지원경로<select value={source} onChange={event => setSource(event.target.value)}><option>전체</option>{sources.map(item => <option key={item}>{item}</option>)}</select></label><label>프로젝트<select value={project} onChange={event => setProject(event.target.value)}><option>전체</option>{projects.map(item => <option key={item}>{item}</option>)}</select></label><label>채용 직무<select value={openingId} onChange={event => setOpeningId(event.target.value)}><option value="전체">전체 공고</option>{availableOpenings.map(item => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label></div>
     <div className="analytics-kpis"><Summary icon={UsersRound} label="기간 내 지원자" value={`${total}명`} /><Summary icon={TrendingUp} label="일평균 지원자" value={`${average.toFixed(1)}명`} /><Summary icon={BriefcaseBusiness} label="현재 누적 지원자" value={`${currentTotal}명`} /></div>
-    <article className="analytics-card trend-card"><header><div><span>APPLICATION TREND</span><h2>날짜별 지원 추이</h2></div><small>{view?.from || '최초 수집일'} ~ {view?.latest || '-'}</small></header>{points.length ? <div className="line-chart"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="날짜별 게임잡 지원자 수"><g className="chart-grid">{[0,1,2,3,4].map(index => { const y = padY + index * ((height - padY * 2) / 4); return <line key={index} x1={padX} y1={y} x2={width - padX} y2={y} /> })}</g><path className="chart-area" d={`${path} L ${points.at(-1)?.x} ${height - padY} L ${points[0]?.x} ${height - padY} Z`} /><path className="chart-line" d={path} />{points.map(point => <g key={point.date}><circle cx={point.x} cy={point.y} r="4" /><title>{point.date}: {point.count}명</title></g>)}</svg><div className="chart-axis">{points.filter((_, index) => index === 0 || index === points.length - 1 || index % Math.max(1, Math.ceil(points.length / 5)) === 0).map(point => <span key={point.date} style={{ left: `${(point.x / width) * 100}%` }}>{formatShortDate(point.date)}</span>)}</div></div> : <div className="chart-no-data">선택한 기간에 지원자가 없습니다.</div>}</article>
-    <div className="analytics-split"><article className="analytics-card"><header><div><span>OPENING SHARE</span><h2>채용 직무별 지원 비중</h2></div></header><div className="donut-layout"><div className="donut" style={{ background: topRows.some(item => item.periodCount) ? `conic-gradient(${stops.join(',')})` : '#eef1f4' }}><div><b>{total}</b><span>지원자</span></div></div><ol>{topRows.map((item, index) => <li key={item.id}><i style={{ background: colors[index] }} /><span>{item.title.replace(/^\[[^]]+]\s*/, '')}</span><b>{item.periodCount}명</b></li>)}</ol></div></article><article className="analytics-card"><header><div><span>OPENING RANKING</span><h2>지원 증가 공고</h2></div></header><div className="ranking-list">{topRows.map((item, index) => <div key={item.id}><em>{index + 1}</em><span><b>{item.title.replace(/^\[[^]]+]\s*/, '')}</b><small>{item.project} · 누적 {item.currentTotal}명{item.unreadTotal ? ` · 미열람 ${item.unreadTotal}명` : ''}</small></span><strong>+{item.periodCount}</strong></div>)}</div></article></div>
-    <article className="analytics-card analytics-table-card"><header><div><span>OPENING DETAILS</span><h2>공고별 지원 현황</h2></div></header><div className="analytics-table-wrap"><table><thead><tr><th>프로젝트</th><th>채용 직무</th><th>기간 내 지원</th><th>누적 지원</th><th>미열람</th><th>마감일</th></tr></thead><tbody>{(view?.openingRows || []).map(item => <tr key={item.id}><td>{item.project}</td><td><b>{item.title.replace(/^\[[^]]+]\s*/, '')}</b>{!item.applicationDatesComplete && <small>일부 날짜는 일일 스냅샷으로 집계</small>}</td><td><strong>+{item.periodCount}명</strong></td><td>{item.currentTotal}명</td><td>{item.unreadTotal}명</td><td>{item.deadline || '-'}</td></tr>)}</tbody></table></div></article>
+    <article className="analytics-card trend-card"><header><div><span>APPLICATION TREND</span><h2>날짜별 지원 추이</h2></div><small>{view?.from || '최초 수집일'} ~ {view?.latest || '-'}</small></header>{points.length ? <div className="line-chart"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="날짜별 지원자 수"><g className="chart-grid">{[0,1,2,3,4].map(index => { const y = padY + index * ((height - padY * 2) / 4); return <line key={index} x1={padX} y1={y} x2={width - padX} y2={y} /> })}</g><path className="chart-area" d={`${path} L ${points.at(-1)?.x} ${height - padY} L ${points[0]?.x} ${height - padY} Z`} /><path className="chart-line" d={path} />{points.map(point => <g key={point.date}><circle cx={point.x} cy={point.y} r="4" /><title>{point.date}: {point.count}명</title></g>)}</svg><div className="chart-axis">{points.filter((_, index) => index === 0 || index === points.length - 1 || index % Math.max(1, Math.ceil(points.length / 5)) === 0).map(point => <span key={point.date} style={{ left: `${(point.x / width) * 100}%` }}>{formatShortDate(point.date)}</span>)}</div></div> : <div className="chart-no-data">선택한 기간에 지원자가 없습니다.</div>}</article>
+    <div className="analytics-split"><article className="analytics-card"><header><div><span>OPENING SHARE</span><h2>채용 직무별 지원 비중</h2></div></header><div className="donut-layout"><div className="donut" style={{ background: topRows.some(item => item.periodCount) ? `conic-gradient(${stops.join(',')})` : '#eef1f4' }}><div><b>{total}</b><span>지원자</span></div></div><ol>{topRows.map((item, index) => <li key={item.id}><i style={{ background: colors[index] }} /><span>{item.title}</span><b>{item.periodCount}명</b></li>)}</ol></div></article><article className="analytics-card"><header><div><span>OPENING RANKING</span><h2>지원 증가 공고</h2></div></header><div className="ranking-list">{topRows.map((item, index) => <div key={item.id}><em>{index + 1}</em><span><b>{item.title}</b><small>{item.project} · {item.channels} · 누적 {item.currentTotal}명</small></span><strong>+{item.periodCount}</strong></div>)}</div></article></div>
+    <article className="analytics-card analytics-table-card"><header><div><span>OPENING DETAILS</span><h2>공고별 지원 현황</h2></div></header><div className="analytics-table-wrap"><table><thead><tr><th>프로젝트</th><th>채용 직무</th><th>지원경로</th><th>기간 내 지원</th><th>누적 지원</th></tr></thead><tbody>{(view?.openingRows || []).map(item => <tr key={item.id}><td>{item.project}</td><td><b>{item.title}</b></td><td>{item.channels}</td><td><strong>+{item.periodCount}명</strong></td><td>{item.currentTotal}명</td></tr>)}</tbody></table></div></article>
   </section>
 }
 
@@ -352,6 +367,27 @@ function OverviewReport({ data }: { data: DashboardData }) {
     const project = projectName(opening)
     projects.set(project, [...(projects.get(project) || []), opening])
   })
+  const overviewColors = ['#1b64da', '#3182f6', '#67a5f6', '#8bbdf9', '#8065dc', '#a69af4', '#56b8a7', '#f0a24a']
+  const projectShares = Array.from(projects.entries()).map(([project, projectOpenings]) => ({
+    project,
+    targetTo: projectOpenings.reduce((sum, opening) => sum + opening.targetTo, 0),
+    openingCount: projectOpenings.length,
+  })).sort((a, b) => b.targetTo - a.targetTo || b.openingCount - a.openingCount || a.project.localeCompare(b.project, 'ko'))
+  const shareUsesTo = projectShares.some(item => item.targetTo > 0)
+  const projectShareTotal = Math.max(1, projectShares.reduce((sum, item) => sum + (shareUsesTo ? item.targetTo : item.openingCount), 0))
+  let shareAngle = 0
+  const projectShareStops = projectShares.map((item, index) => {
+    const start = shareAngle
+    shareAngle += ((shareUsesTo ? item.targetTo : item.openingCount) / projectShareTotal) * 360
+    return `${overviewColors[index % overviewColors.length]} ${start}deg ${shareAngle}deg`
+  })
+  const stageCount = (...stages: PipelineStage[]) => candidates.filter(candidate => stages.includes(candidate.stage)).length
+  const pipelineSummary = [
+    { label: '코딩 테스트', count: stageCount('코딩테스트'), tone: 'coding' },
+    { label: '면접', count: stageCount('면접', '1차 면접', '2차 면접', '면접합격'), tone: 'interview' },
+    { label: '처우 협의', count: stageCount('처우단계'), tone: 'salary' },
+    { label: '오퍼', count: stageCount('Offer'), tone: 'offer' },
+  ]
   const openReport = () => { setReportText(createSlackReport(active)); setCopied(false); setReportOpen(true) }
   const copyReport = async () => {
     try { await navigator.clipboard.writeText(reportText) }
@@ -360,6 +396,7 @@ function OverviewReport({ data }: { data: DashboardData }) {
   }
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
+    <section className="overview-insights"><article className="overview-insight-card"><header><span>PROJECT SHARE</span><h2>프로젝트별 목표 TO 비중</h2></header><div className="overview-share-layout"><div className="overview-donut" style={{ background: projectShares.length ? `conic-gradient(${projectShareStops.join(',')})` : '#eef1f4' }}><div><b>{shareUsesTo ? targetTo : active.length}</b><span>{shareUsesTo ? '목표 TO' : '오픈 공고'}</span></div></div><ol>{projectShares.map((item, index) => { const value = shareUsesTo ? item.targetTo : item.openingCount; const ratio = Math.round((value / projectShareTotal) * 100); return <li key={item.project}><i style={{ background: overviewColors[index % overviewColors.length] }} /><span><b>{item.project}</b><small>{ratio}%</small></span><strong>{shareUsesTo ? `${item.targetTo}명` : `${item.openingCount}개`}</strong></li> })}</ol></div></article><article className="overview-insight-card"><header><span>PIPELINE STATUS</span><h2>현재 전형 진행 현황</h2></header><div className="pipeline-summary">{pipelineSummary.map(item => <div className={`pipeline-summary-item ${item.tone}`} key={item.label}><span>{item.label}</span><b>{item.count}명</b><small>진행 중</small></div>)}</div></article></section>
     <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header><div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead><tbody>{Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko')).flatMap(([project, projectOpenings]) => { const sorted = [...projectOpenings].sort((a, b) => a.title.localeCompare(b.title, 'ko')); const projectTargetTo = sorted.reduce((sum, opening) => sum + opening.targetTo, 0); return sorted.map((opening, index) => { const note = notes.get(opening.id)!; return <tr key={opening.id}>{index === 0 && <th className="project-cell" rowSpan={sorted.length}><span>{project}</span><small>({projectTargetTo}명)</small></th>}<td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}</td><td className="to-cell"><b>{opening.targetTo ? `${opening.targetTo}명` : '미입력'}</b></td><td className="reason-cell">{opening.reason.trim() || '미입력'}</td><td className="progress-cell"><ProgressSituation opening={opening} note={note} /></td></tr> }) })}</tbody></table></div></article>
     {reportOpen && <div className="modal-backdrop" onMouseDown={() => setReportOpen(false)}><section className="modal report-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>SLACK REPORT</span><h2>슬랙 채용 리포트</h2></div><button onClick={() => setReportOpen(false)}><X /></button></header><div className="report-guide"><b>복사해서 Slack에 바로 붙여 넣으세요</b><p>프로젝트별로 채용 직무, 목표 TO, 현재 진행사항만 간단하게 표시합니다.</p></div><label className="report-editor-label">보고 문구 미리보기<textarea className="report-textarea" value={reportText} onChange={e => setReportText(e.target.value)} /></label><div className="modal-actions"><span className="copy-status">{copied ? 'Slack 문구를 복사했습니다.' : ''}</span><button className="outline" onClick={() => setReportOpen(false)}>닫기</button><button className="primary" onClick={copyReport}><ClipboardCopy size={15} /> Slack 문구 복사</button></div></section></div>}
   </section>

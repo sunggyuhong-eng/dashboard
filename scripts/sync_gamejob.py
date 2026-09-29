@@ -23,6 +23,26 @@ def opening_id(project: object, title: object) -> str:
     return f"sheet-{digest}"
 
 
+def normalize_application_project(value: object) -> str:
+    project = " ".join(str(value or "").strip().split())
+    if project.lower().startswith("project "):
+        project = project[8:].strip()
+    if project.lower() in {"octopus", "otps"}:
+        return "OTPS"
+    if project.lower().replace(" ", "") == "artdivision":
+        return "Art실"
+    if project.lower().replace(" ", "") == "server실":
+        return "Server실"
+    return project or "프로젝트 미지정"
+
+
+def normalize_application_title(value: object) -> str:
+    title = " ".join(str(value or "").strip().split())
+    if title.startswith("[") and "]" in title:
+        title = title.split("]", 1)[1].strip()
+    return title.replace("Software Engineer", "소프트웨어 엔지니어")
+
+
 def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = None) -> tuple[dict, int]:
     candidates_by_opening: dict[str, list[dict]] = defaultdict(list)
     for candidate in sheet_data.get("candidates", []):
@@ -64,9 +84,27 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
         })
 
     openings.sort(key=lambda item: (normalized(item["project"]), normalized(item["title"])))
+    applications = []
+    for source in sheet_data.get("applications", []):
+        if not isinstance(source, dict):
+            continue
+        date = str(source.get("date") or "").strip()[:10]
+        channel = str(source.get("source") or "").strip()
+        project = normalize_application_project(source.get("project"))
+        title = normalize_application_title(source.get("openingTitle"))
+        if date and channel and title:
+            applications.append({
+                "date": date,
+                "source": channel,
+                "project": project,
+                "openingTitle": title,
+            })
+    applications.sort(key=lambda item: (item["date"], normalized(item["source"]), normalized(item["project"]), normalized(item["openingTitle"])))
+
     dashboard = {
         "openings": openings,
         "candidateCount": sum(len(opening["candidates"]) for opening in openings),
+        "applications": applications,
         "syncedAt": datetime.now(timezone.utc).isoformat(),
     }
     unmatched = sum(len(items) for key, items in candidates_by_opening.items() if key not in current_keys)

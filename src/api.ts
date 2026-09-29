@@ -1,12 +1,14 @@
-import { PIPELINE_STAGES, type Candidate, type DashboardData, type GamejobAnalyticsData, type Opening, type PipelineStage } from './types'
+import { PIPELINE_STAGES, type ApplicationRecord, type Candidate, type DashboardData, type Opening, type PipelineStage } from './types'
 
 type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; reason?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
+type SheetApplication = { date?: unknown; source?: unknown; project?: unknown; openingTitle?: unknown }
 type SheetPayload = {
   ok?: boolean
   error?: string
   openings?: SheetOpening[]
   candidates?: SheetCandidate[]
+  applications?: SheetApplication[]
   hiredCounts?: Record<string, unknown>
   syncedAt?: string
 }
@@ -14,6 +16,17 @@ type SheetPayload = {
 const clean = (value: unknown) => String(value ?? '').trim()
 const normalized = (value: unknown) => clean(value).replace(/\s+/g, ' ').toLowerCase()
 const openingKey = (project: unknown, title: unknown) => `${normalized(project)}\u001f${normalized(title)}`
+const normalizeProject = (value: unknown) => {
+  const project = clean(value).replace(/^Project\s+/i, '').trim()
+  if (/^(octopus|otps)$/i.test(project)) return 'OTPS'
+  if (/^art\s*division$/i.test(project)) return 'Art실'
+  if (/^server\s*실$/i.test(project)) return 'Server실'
+  return project || '프로젝트 미지정'
+}
+const normalizeOpeningTitle = (value: unknown) => clean(value)
+  .replace(/^\[[^\]]+]\s*/, '')
+  .replace(/Software\s+Engineer/gi, '소프트웨어 엔지니어')
+  .trim()
 
 async function openingId(project: unknown, title: unknown) {
   const input = new TextEncoder().encode(openingKey(project, title))
@@ -84,9 +97,19 @@ async function buildLiveDashboard(payload: SheetPayload, previous: DashboardData
     })
   }
   openings.sort((a, b) => `${a.project}\u001f${a.title}`.localeCompare(`${b.project}\u001f${b.title}`, 'ko'))
+  const applications: ApplicationRecord[] = Array.isArray(payload.applications)
+    ? payload.applications.flatMap(source => {
+      const date = clean(source.date).slice(0, 10)
+      const channel = clean(source.source)
+      const title = normalizeOpeningTitle(source.openingTitle)
+      if (!date || !channel || !title) return []
+      return [{ date, source: channel, project: normalizeProject(source.project), openingTitle: title }]
+    })
+    : (previous?.applications || [])
   return {
     openings,
     candidateCount: openings.reduce((sum, opening) => sum + opening.candidates.length, 0),
+    applications,
     syncedAt: payload.syncedAt || new Date().toISOString(),
     sheetApiUrl: previous?.sheetApiUrl || '',
   }
@@ -98,19 +121,12 @@ export const api = {
     if (!response.ok) throw new Error('동기화 데이터를 찾지 못했습니다. GitHub Actions를 먼저 실행해 주세요.')
     const body = await response.json() as DashboardData & { error?: string }
     if (!Array.isArray(body.openings)) throw new Error(body.error || '대시보드 데이터 형식이 올바르지 않습니다.')
+    if (!Array.isArray(body.applications)) body.applications = []
     return body
   },
 
   async liveDashboard(previous: DashboardData | null): Promise<DashboardData> {
     const endpoint = previous?.sheetApiUrl?.trim() || ''
     return buildLiveDashboard(await readSheetJsonp(endpoint), previous)
-  },
-
-  async gamejobAnalytics(): Promise<GamejobAnalyticsData> {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/gamejob-applicants.json?t=${Date.now()}`, { cache: 'no-store' })
-    if (!response.ok) throw new Error('게임잡 지원자 추이 데이터를 찾지 못했습니다.')
-    const body = await response.json() as GamejobAnalyticsData
-    if (!Array.isArray(body.openings) || !Array.isArray(body.dailyApplications)) throw new Error('게임잡 지원자 추이 데이터 형식이 올바르지 않습니다.')
-    return body
   },
 }

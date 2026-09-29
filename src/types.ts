@@ -37,31 +37,13 @@ export type DashboardData = {
   openings: Opening[]
   syncedAt: string
   candidateCount: number
+  applications: ApplicationRecord[]
   sheetApiUrl?: string
 }
 
-export type GamejobAnalyticsOpening = {
-  id: string
-  title: string
-  project: string
-  currentTotal: number
-  unreadTotal: number
-  postedAt: string
-  modifiedAt: string
-  deadline: string
-  applicationDatesComplete: boolean
-}
-
-export type DailyApplication = {
+export type ApplicationRecord = {
   date: string
-  openingId: string
-  count: number
-}
-
-export type GamejobAnalyticsData = {
-  version: number
-  syncedAt: string
-  source: 'gamejob'
-  openings: GamejobAnalyticsOpening[]
-  dailyApplications: DailyApplication[]
+  source: '게임잡' | '그리팅' | string
+  project: string
+  openingTitle: string
 }

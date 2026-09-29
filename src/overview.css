@@ -1,0 +1,9 @@
+.operations-layout {
+  grid-template-columns: minmax(330px, .82fr) minmax(460px, 1.18fr);
+}
+
+@media (max-width: 1200px) {
+  .operations-layout {
+    grid-template-columns: minmax(300px, .9fr) minmax(400px, 1.1fr);
+  }
+}

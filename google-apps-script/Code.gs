@@ -47,14 +47,15 @@ function dashboard_() {
   for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
     var openingRow = openingTable.values[o];
     var openingProject = clean_(openingRow[openingTable.columns.project]);
-    var openingTitle = clean_(openingRow[openingTable.columns.title]);
+    var openingTitle = dashboardOpeningTitle_(openingRow[openingTable.columns.title]);
     if (!openingProject || !openingTitle) continue;
     openings.push({
       row: o + 1,
       project: openingProject,
       title: openingTitle,
       targetTo: number_(openingRow[openingTable.columns.targetTo]),
-      reason: clean_(openingRow[openingTable.columns.reason])
+      reason: clean_(openingRow[openingTable.columns.reason]),
+      approvalUrl: openingTable.approvalLinks[o] || ''
     });
   }
 
@@ -72,7 +73,7 @@ function dashboard_() {
     var rawRow = candidateTable.rawValues[i] || [];
     var stage = clean_(row[col['진행단계']]);
     var name = clean_(row[col['이름']]);
-    var title = clean_(row[col['직무(공고명)']]);
+    var title = dashboardOpeningTitle_(row[col['직무(공고명)']]);
     var project = col['PJ'] == null ? '' : clean_(row[col['PJ']]);
     if (!title) continue;
     var openingKey = key_(project, title);
@@ -118,7 +119,7 @@ function applicationRows_(ss) {
     var rawRow = table.rawValues[i] || [];
     var source = clean_(displayRow[columns.source]);
     var project = clean_(displayRow[columns.project]);
-    var title = clean_(displayRow[columns.title]);
+    var title = dashboardOpeningTitle_(displayRow[columns.title]);
     var date = applicationDate_(rawRow[columns.date], displayRow[columns.date], timezone);
     if (!date || !source || !title) continue;
     rows.push({
@@ -157,12 +158,7 @@ function applicationTable_(sheet) {
 }
 
 function applicationDate_(raw, display, timezone) {
-  if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw.getTime())) {
-    return Utilities.formatDate(raw, timezone || Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  }
-  var match = clean_(display).match(/(\d{4})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})/);
-  if (!match) return '';
-  return match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2);
+  return dashboardDate_(raw, display, timezone);
 }
 
 function openingTable_(sheet) {
@@ -171,7 +167,8 @@ function openingTable_(sheet) {
     project: ['프로젝트', '프로젝트명', '프로젝트 명', '프로젝트 이름', 'PJ'],
     title: ['공고명', '공고 이름', '직무(공고명)'],
     targetTo: ['채용인원', '채용 인원', 'TO', '목표 TO'],
-    reason: ['채용사유', '채용 사유', '채용배경', '채용 배경']
+    reason: ['채용사유', '채용 사유', '채용배경', '채용 배경'],
+    approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서']
   };
   for (var r = 0; r < Math.min(values.length, 40); r++) {
     var columns = {};
@@ -182,7 +179,19 @@ function openingTable_(sheet) {
       });
     });
     if (columns.project != null && columns.title != null && columns.targetTo != null && columns.reason != null) {
-      return { values: values, headerRow: r + 1, columns: columns };
+      var approvalLinks = [];
+      if (columns.approvalUrl != null && values.length > r + 1) {
+        // 사본의 링크 열만 읽습니다. 원본 접근이나 시트 수정은 하지 않습니다.
+        var linkRange = sheet.getRange(r + 2, columns.approvalUrl + 1, values.length - r - 1, 1);
+        var richLinks = linkRange.getRichTextValues();
+        var linkFormulas = linkRange.getFormulas();
+        for (var l = 0; l < richLinks.length; l++) {
+          approvalLinks[r + 1 + l] = dashboardApprovalLink_(
+            values[r + 1 + l][columns.approvalUrl], richLinks[l][0], linkFormulas[l][0]
+          );
+        }
+      }
+      return { values: values, headerRow: r + 1, columns: columns, approvalLinks: approvalLinks };
     }
   }
   throw new Error(sheet.getName() + ' 시트에서 프로젝트, 공고명, 채용인원, 채용사유 헤더를 찾지 못했습니다.');
@@ -221,11 +230,84 @@ function firstColumn_(columns, names) {
 
 function dateValue_(rawRow, displayRow, column, timezone) {
   if (column == null) return '';
-  var raw = rawRow[column];
+  return dashboardDate_(rawRow[column], displayRow[column], timezone);
+}
+
+// 실제 날짜 값, 수식의 숫자/문자열 결과를 yyyy-MM-dd로 통일합니다.
+// getValues()의 실제 값이 우선이며 시트에는 아무 값도 쓰지 않습니다.
+function dashboardDate_(raw, display, timezone) {
   if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw.getTime())) {
     return Utilities.formatDate(raw, timezone || Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
-  return clean_(displayRow[column]);
+
+  var parsed = dashboardDateText_(raw);
+  // null은 미지원 형식, 빈 문자열은 형식은 맞지만 존재하지 않는 날짜입니다.
+  if (parsed !== null) return parsed;
+  parsed = dashboardDateText_(display);
+  if (parsed !== null) return parsed;
+
+  // 날짜 서식을 적용하지 않은 DATE 수식 결과(시트 일련번호)도 지원합니다.
+  // 2000~2099년 범위의 숫자만 허용하여 연도나 짧은 숫자의 오인을 막습니다.
+  if (typeof raw === 'number' && isFinite(raw) && raw >= 36526 && raw < 73051) {
+    var serialDate = new Date(Date.UTC(1899, 11, 30) + Math.floor(raw) * 86400000);
+    return dashboardDateParts_(serialDate.getUTCFullYear(), serialDate.getUTCMonth() + 1, serialDate.getUTCDate());
+  }
+  return '';
+}
+
+function dashboardDateText_(value) {
+  var text = clean_(value);
+  if (!text) return null;
+  text = text.normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/^'/, '').trim();
+  text = text.replace(/[\u2010-\u2015\u2212]/g, '-');
+
+  // 20261013 / 숫자 20261013 / 20261013 14:30
+  var match = text.match(/^(\d{4})(\d{2})(\d{2})(?=$|[T\s(])/);
+  if (match) return dashboardDateParts_(match[1], match[2], match[3]);
+
+  // 2026-10-13 / 2026. 10. 13. / 2026/10/13 / 2026년 10월 13일
+  // 날짜 뒤의 시각·요일·입사 예정 메모는 날짜를 변경하지 않습니다.
+  match = text.match(/^(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})(?=$|[^\d])/);
+  if (match) return dashboardDateParts_(match[1], match[2], match[3]);
+  return null;
+}
+
+function dashboardDateParts_(year, month, day) {
+  year = Number(year);
+  month = Number(month);
+  day = Number(day);
+  if (year < 1000 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31) return '';
+  var check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() + 1 !== month || check.getUTCDate() !== day) return '';
+  return year + '-' + ('0' + month).slice(-2) + '-' + ('0' + day).slice(-2);
+}
+
+// 공고명 맨 앞의 [프로젝트명] 한 개만 제외하여 같은 공고로 연결합니다.
+// 프로젝트는 별도의 PJ/프로젝트 열을 그대로 사용하며 시트 값은 수정하지 않습니다.
+// 계약직·경력 조건과 제목 중간/끝의 대괄호는 보존합니다.
+function dashboardOpeningTitle_(value) {
+  return clean_(value).replace(/^\[[^\[\]\r\n]+\]\s*/, '').trim();
+}
+
+// URL 원문, 텍스트에 삽입한 링크, HYPERLINK("URL", "표시명")을 지원합니다.
+// 여러 다른 링크가 든 셀은 임의의 신청서를 선택하지 않습니다.
+function dashboardApprovalLink_(display, richText, formula) {
+  if (richText) {
+    var direct = richText.getLinkUrl();
+    if (direct) return dashboardWebUrl_(direct);
+    var links = richText.getRuns().map(function(run) { return run.getLinkUrl(); })
+      .filter(function(url, index, all) { return url && all.indexOf(url) === index; });
+    if (links.length > 1) return '';
+    if (links.length === 1) return dashboardWebUrl_(links[0]);
+  }
+  var hyperlink = clean_(formula).match(/^=\s*HYPERLINK\s*\(\s*"((?:[^"]|"")*)"\s*[,;)]/i);
+  if (hyperlink) return dashboardWebUrl_(hyperlink[1].replace(/""/g, '"'));
+  return dashboardWebUrl_(display);
+}
+
+function dashboardWebUrl_(value) {
+  var url = clean_(value);
+  return /^https?:\/\/[^\s\\<>"'/?#]+(?:[/?#][^\s\\<>"']*)?$/i.test(url) ? url : '';
 }
 
 function clean_(value) {

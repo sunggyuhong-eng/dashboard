@@ -28,6 +28,7 @@ export type Opening = {
   targetTo: number
   hiredCount: number
   reason: string
+  approvalUrl?: string
   source: 'sheet'
   isNew: boolean
   candidates: Candidate[]

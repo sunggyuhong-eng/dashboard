@@ -3,15 +3,28 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
 
 def normalized(value: object) -> str:
     return " ".join(str(value or "").strip().lower().split())
+
+
+def approval_link(value: object) -> str:
+    url = value.strip() if isinstance(value, str) else ""
+    if not re.match(r"^https?://", url, re.I) or re.search(r"[\s\\<>\"']", url):
+        return ""
+    try:
+        parsed = urlsplit(url)
+        return url if parsed.scheme.lower() in {"https", "http"} and parsed.hostname else ""
+    except ValueError:
+        return ""
 
 
 def opening_key(project: object, title: object) -> str:
@@ -80,6 +93,7 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
             "targetTo": max(0, int(float(source.get("targetTo") or 0))),
             "hiredCount": int(hired_counts.get(key, 0) or 0),
             "reason": str(source.get("reason") or "").strip(),
+            "approvalUrl": approval_link(source.get("approvalUrl")),
             "candidates": candidates,
         })
 

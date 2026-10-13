@@ -85,3 +85,25 @@ def test_new_badge_only_marks_openings_added_since_previous_sync():
 
     next_dashboard, _ = build_dashboard(sheet_data, {item["id"] for item in dashboard["openings"]})
     assert all(item["isNew"] is False for item in next_dashboard["openings"])
+
+
+def test_approval_links_follow_each_opening_and_keep_ids_when_links_change():
+    data = {"openings": [
+        {"project": "QA실", "title": "QA 담당자", "approvalUrl": "https://example.com/approval/qa"},
+        {"project": "HERO", "title": "QA 담당자", "approvalUrl": "https://example.com/approval/hero"},
+    ], "candidates": []}
+    dashboard, _ = build_dashboard(data)
+    links = {item["project"]: item["approvalUrl"] for item in dashboard["openings"]}
+    assert links == {"QA실": "https://example.com/approval/qa", "HERO": "https://example.com/approval/hero"}
+    old_ids = {item["id"] for item in dashboard["openings"]}
+    data["openings"][0]["approvalUrl"] = ""
+    changed, _ = build_dashboard(data, old_ids)
+    assert {item["id"] for item in changed["openings"]} == old_ids
+    assert not any(item["isNew"] for item in changed["openings"])
+    assert next(item for item in changed["openings"] if item["project"] == "QA실")["approvalUrl"] == ""
+
+
+def test_approval_link_is_optional_and_rejects_non_web_addresses():
+    for url in [None, "", "javascript:alert(1)", "//example.com/approval", "https://", "https://example.com/one\ntwo"]:
+        dashboard, _ = build_dashboard({"openings": [{"project": "QA실", "title": "QA 담당자", "approvalUrl": url}], "candidates": []})
+        assert dashboard["openings"][0]["approvalUrl"] == ""

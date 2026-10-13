@@ -1,6 +1,7 @@
 import { PIPELINE_STAGES, type ApplicationRecord, type Candidate, type DashboardData, type Opening, type PipelineStage } from './types'
+import { approvalLink } from './links'
 
-type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; reason?: unknown }
+type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; reason?: unknown; approvalUrl?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
 type SheetApplication = { date?: unknown; source?: unknown; project?: unknown; openingTitle?: unknown }
 type SheetPayload = {
@@ -57,7 +58,7 @@ function readSheetJsonp(sheetApiUrl: string): Promise<SheetPayload> {
   })
 }
 
-async function buildLiveDashboard(payload: SheetPayload, previous: DashboardData | null): Promise<DashboardData> {
+export async function buildLiveDashboard(payload: SheetPayload, previous: DashboardData | null): Promise<DashboardData> {
   if (!payload.ok || !Array.isArray(payload.openings) || !Array.isArray(payload.candidates)) {
     throw new Error(payload.error || '시트 데이터 형식이 올바르지 않습니다.')
   }
@@ -92,6 +93,7 @@ async function buildLiveDashboard(payload: SheetPayload, previous: DashboardData
       targetTo: Math.max(0, Number(source.targetTo) || 0),
       hiredCount: Math.max(0, Number(payload.hiredCounts?.[key]) || 0),
       reason: clean(source.reason),
+      approvalUrl: approvalLink(source.approvalUrl),
       isNew: previous !== null && !previousIds.has(id),
       candidates: candidatesByOpening.get(key) || [],
     })

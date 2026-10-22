@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "openings": [
+    {"project": "MAZE", "title": "소프트웨어 엔지니어 모집 (경력 5년 이상)", "targetTo": 3, "toGroup": "MAZE-개발-01", "reason": "개발 인력 대체채용", "approvalUrl": "https://example.com/approval/software"},
+    {"project": "MAZE", "title": "그래픽스 프로그래머 모집 (경력 5년 이상)", "targetTo": 3, "toGroup": "MAZE-개발-01", "reason": "개발 인력 대체채용", "approvalUrl": "https://example.com/approval/graphics"}
+  ],
+  "candidates": [
+    {"id": "row-2", "row": 2, "name": "테스트 A", "stage": "1차 면접", "project": "MAZE", "openingTitle": "소프트웨어 엔지니어 모집 (경력 5년 이상)", "firstInterviewDate": "2026-11-19"},
+    {"id": "row-3", "row": 3, "name": "테스트 B", "stage": "코딩테스트", "project": "MAZE", "openingTitle": "소프트웨어 엔지니어 모집 (경력 5년 이상)"},
+    {"id": "row-4", "row": 4, "name": "테스트 C", "stage": "2차 면접", "project": "MAZE", "openingTitle": "그래픽스 프로그래머 모집 (경력 5년 이상)", "secondInterviewDate": "2026-11-20"},
+    {"id": "row-5", "row": 5, "name": "테스트 D", "stage": "Offer", "project": "MAZE", "openingTitle": "그래픽스 프로그래머 모집 (경력 5년 이상)", "hireDate": "2026-12-01"}
+  ],
+  "hiredCounts": {},
+  "applications": [],
+  "syncedAt": "2026-10-22T00:00:00Z"
+}

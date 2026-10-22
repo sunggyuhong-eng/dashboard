@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import urlsplit
+
+import httpx
+
+
+def normalized(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def approval_link(value: object) -> str:
+    url = value.strip() if isinstance(value, str) else ""
+    if not re.match(r"^https?://", url, re.I) or re.search(r"[\s\\<>\"']", url):
+        return ""
+    try:
+        parsed = urlsplit(url)
+        return url if parsed.scheme.lower() in {"https", "http"} and parsed.hostname else ""
+    except ValueError:
+        return ""
+
+
+def opening_key(project: object, title: object) -> str:
+    return f"{normalized(project)}\x1f{normalized(title)}"
+
+
+def opening_id(project: object, title: object) -> str:
+    digest = hashlib.sha256(opening_key(project, title).encode("utf-8")).hexdigest()[:16]
+    return f"sheet-{digest}"
+
+
+def validate_shared_to(openings: list[dict]) -> None:
+    groups: dict[tuple[str, str], set[int]] = defaultdict(set)
+    for opening in openings:
+        group = normalized(opening.get("toGroup"))
+        if not group:
+            continue
+        project = normalized(opening["project"])
+        project = re.sub(r"^project\s+", "", project).strip()
+        if project in {"octopus", "otps"}:
+            project = "otps"
+        key = (project, group)
+        if opening["targetTo"] > 0:
+            groups[key].add(opening["targetTo"])
+        if len(groups[key]) > 1:
+            raise ValueError(
+                f'{opening["project"]} / {opening["toGroup"]}의 채용인원이 서로 다릅니다. '
+                '같은 TO 그룹에는 동일한 전체 채용인원을 입력해 주세요.'
+            )
+
+
+def normalize_application_project(value: object) -> str:
+    project = " ".join(str(value or "").strip().split())
+    if project.lower().startswith("project "):
+        project = project[8:].strip()
+    if project.lower() in {"octopus", "otps"}:
+        return "OTPS"
+    if project.lower().replace(" ", "") == "artdivision":
+        return "Art실"
+    if project.lower().replace(" ", "") == "server실":
+        return "Server실"
+    return project or "프로젝트 미지정"
+
+
+def normalize_application_title(value: object) -> str:
+    title = " ".join(str(value or "").strip().split())
+    if title.startswith("[") and "]" in title:
+        title = title.split("]", 1)[1].strip()
+    return title.replace("Software Engineer", "소프트웨어 엔지니어")
+
+
+def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = None) -> tuple[dict, int]:
+    candidates_by_opening: dict[str, list[dict]] = defaultdict(list)
+    for candidate in sheet_data.get("candidates", []):
+        key = opening_key(candidate.get("project"), candidate.get("openingTitle"))
+        if key.strip("\x1f"):
+            candidates_by_opening[key].append(candidate)
+
+    hired_counts = sheet_data.get("hiredCounts") if isinstance(sheet_data.get("hiredCounts"), dict) else {}
+    openings = []
+    current_keys: set[str] = set()
+    seen_ids: set[str] = set()
+
+    for source in sheet_data.get("openings", []):
+        project = str(source.get("project") or "").strip()
+        title = str(source.get("title") or "").strip()
+        if not project or not title:
+            continue
+        key = opening_key(project, title)
+        item_id = opening_id(project, title)
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
+        current_keys.add(key)
+        candidates = candidates_by_opening.get(key, [])
+        openings.append({
+            "id": item_id,
+            "title": title,
+            "url": "",
+            "postedAt": "",
+            "deadline": "",
+            "source": "sheet",
+            "isNew": previous_opening_ids is not None and item_id not in previous_opening_ids,
+            "status": "진행중",
+            "project": project,
+            "targetTo": max(0, int(float(source.get("targetTo") or 0))),
+            "toGroup": " ".join(str(source.get("toGroup") or "").split()),
+            "hiredCount": int(hired_counts.get(key, 0) or 0),
+            "reason": str(source.get("reason") or "").strip(),
+            "approvalUrl": approval_link(source.get("approvalUrl")),
+            "candidates": candidates,
+        })
+
+    validate_shared_to(openings)
+    openings.sort(key=lambda item: (normalized(item["project"]), normalized(item["title"])))
+    applications = []
+    for source in sheet_data.get("applications", []):
+        if not isinstance(source, dict):
+            continue
+        date = str(source.get("date") or "").strip()[:10]
+        channel = str(source.get("source") or "").strip()
+        project = normalize_application_project(source.get("project"))
+        title = normalize_application_title(source.get("openingTitle"))
+        if date and channel and title:
+            applications.append({
+                "date": date,
+                "source": channel,
+                "project": project,
+                "openingTitle": title,
+            })
+    applications.sort(key=lambda item: (item["date"], normalized(item["source"]), normalized(item["project"]), normalized(item["openingTitle"])))
+
+    dashboard = {
+        "openings": openings,
+        "candidateCount": sum(len(opening["candidates"]) for opening in openings),
+        "applications": applications,
+        "syncedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    unmatched = sum(len(items) for key, items in candidates_by_opening.items() if key not in current_keys)
+    return dashboard, unmatched
+
+
+def load_previous_opening_ids() -> set[str] | None:
+    path = os.getenv("PREVIOUS_DASHBOARD_PATH", "").strip()
+    if not path:
+        return None
+    try:
+        previous = json.loads(Path(path).read_text(encoding="utf-8"))
+        openings = previous.get("openings") if isinstance(previous, dict) else None
+        if not isinstance(openings, list):
+            return None
+        return {str(item.get("id")) for item in openings if isinstance(item, dict) and item.get("id")}
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def main() -> int:
+    # GitHub Secret을 복사할 때 함께 들어간 줄바꿈이나 앞뒤 공백을 제거합니다.
+    endpoint = "".join(os.getenv("SHEET_API_URL", "").split())
+    token = os.getenv("SHEET_API_TOKEN", "").strip()
+    if not endpoint or not token:
+        raise RuntimeError("SHEET_API_URL 또는 SHEET_API_TOKEN Secret이 없습니다.")
+
+    response = httpx.post(
+        endpoint,
+        content=json.dumps({"action": "dashboard", "token": token}, ensure_ascii=False).encode(),
+        headers={"Content-Type": "text/plain;charset=utf-8"},
+        timeout=httpx.Timeout(connect=30, read=60, write=30, pool=30),
+        follow_redirects=True,
+    )
+    response.raise_for_status()
+    sheet_data = response.json()
+    if (
+        not sheet_data.get("ok")
+        or not isinstance(sheet_data.get("openings"), list)
+        or not isinstance(sheet_data.get("candidates"), list)
+    ):
+        raise RuntimeError(sheet_data.get("error") or "연동용 사본의 공고 또는 지원자 데이터를 가져오지 못했습니다.")
+
+    dashboard, unmatched = build_dashboard(sheet_data, load_previous_opening_ids())
+    # 읽기 전용 즉시 불러오기에 사용합니다. 이 URL은 기존 배포 JSON과 마찬가지로 공개됩니다.
+    dashboard["sheetApiUrl"] = endpoint
+    if not dashboard["openings"]:
+        raise RuntimeError("Dashboard_TO 탭에 표시할 공고가 없어 기존 배포 상태를 유지합니다.")
+
+    output = Path(__file__).resolve().parents[1] / "public" / "data" / "dashboard.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(dashboard, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(
+        f"Dashboard_TO 공고 {len(dashboard['openings'])}건과 진행 지원자 "
+        f"{dashboard['candidateCount']}명을 연결했습니다. 공고 불일치 지원자 {unmatched}명"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

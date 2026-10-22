@@ -26,6 +26,7 @@ export type Opening = {
   deadline: string
   status: '진행중' | '마감'
   targetTo: number
+  toGroup?: string
   hiredCount: number
   reason: string
   approvalUrl?: string

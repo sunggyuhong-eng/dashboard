@@ -36,6 +36,26 @@ def opening_id(project: object, title: object) -> str:
     return f"sheet-{digest}"
 
 
+def validate_shared_to(openings: list[dict]) -> None:
+    groups: dict[tuple[str, str], set[int]] = defaultdict(set)
+    for opening in openings:
+        group = normalized(opening.get("toGroup"))
+        if not group:
+            continue
+        project = normalized(opening["project"])
+        project = re.sub(r"^project\s+", "", project).strip()
+        if project in {"octopus", "otps"}:
+            project = "otps"
+        key = (project, group)
+        if opening["targetTo"] > 0:
+            groups[key].add(opening["targetTo"])
+        if len(groups[key]) > 1:
+            raise ValueError(
+                f'{opening["project"]} / {opening["toGroup"]}의 채용인원이 서로 다릅니다. '
+                '같은 TO 그룹에는 동일한 전체 채용인원을 입력해 주세요.'
+            )
+
+
 def normalize_application_project(value: object) -> str:
     project = " ".join(str(value or "").strip().split())
     if project.lower().startswith("project "):
@@ -91,12 +111,14 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
             "status": "진행중",
             "project": project,
             "targetTo": max(0, int(float(source.get("targetTo") or 0))),
+            "toGroup": " ".join(str(source.get("toGroup") or "").split()),
             "hiredCount": int(hired_counts.get(key, 0) or 0),
             "reason": str(source.get("reason") or "").strip(),
             "approvalUrl": approval_link(source.get("approvalUrl")),
             "candidates": candidates,
         })
 
+    validate_shared_to(openings)
     openings.sort(key=lambda item: (normalized(item["project"]), normalized(item["title"])))
     applications = []
     for source in sheet_data.get("applications", []):

@@ -44,3 +44,13 @@
 .opening-title-line{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}
 .opening-title-line .approval-shortcut{margin-left:0}
 @media print{.approval-shortcut{display:none}}
+
+/* A shared pool spans posting rows; candidates remain in their own row. */
+.project-status-table .shared-to-cell{text-align:center;background:#f2f7ff;vertical-align:middle}
+.shared-to-label{display:block;margin-bottom:4px;color:#1b64da;font-size:12px;font-weight:700;white-space:nowrap}
+.project-status-table .shared-to-cell small{display:block;margin-top:5px;color:#6b7684;font-size:11px;line-height:1.5}
+.project-status-table .shared-reason-cell{background:#f8fbff}
+.project-status-table .shared-to-row .role-cell{border-left:3px solid #a8caff}
+.project-status-table .shared-to-start td{border-top-color:#b8cfea}
+.shared-to-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:0 0 20px;padding:16px 20px;border:1px solid #d8e6fb;border-radius:14px;background:#f6f9ff;color:#4e5968;font-size:13px;line-height:1.65}
+.shared-to-summary>b{color:#1b64da;white-space:nowrap}.shared-to-summary>span{flex:1;min-width:180px;overflow-wrap:anywhere}.shared-to-summary>small{flex-basis:100%;color:#6b7684;font-size:12px}

@@ -54,6 +54,7 @@ function dashboard_() {
       project: openingProject,
       title: openingTitle,
       targetTo: number_(openingRow[openingTable.columns.targetTo]),
+      toGroup: openingTable.columns.toGroup == null ? '' : clean_(openingRow[openingTable.columns.toGroup]).replace(/\s+/g, ' '),
       reason: clean_(openingRow[openingTable.columns.reason]),
       approvalUrl: openingTable.approvalLinks[o] || ''
     });
@@ -167,6 +168,7 @@ function openingTable_(sheet) {
     project: ['프로젝트', '프로젝트명', '프로젝트 명', '프로젝트 이름', 'PJ'],
     title: ['공고명', '공고 이름', '직무(공고명)'],
     targetTo: ['채용인원', '채용 인원', 'TO', '목표 TO'],
+    toGroup: ['TO 그룹', 'TO그룹', '공유 TO 그룹', '공유TO그룹'],
     reason: ['채용사유', '채용 사유', '채용배경', '채용 배경'],
     approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서']
   };

@@ -1,7 +1,8 @@
 import { PIPELINE_STAGES, type ApplicationRecord, type Candidate, type DashboardData, type Opening, type PipelineStage } from './types'
 import { approvalLink } from './links'
+import { groupOpeningsByTo } from './headcount'
 
-type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; reason?: unknown; approvalUrl?: unknown }
+type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
 type SheetApplication = { date?: unknown; source?: unknown; project?: unknown; openingTitle?: unknown }
 type SheetPayload = {
@@ -91,6 +92,7 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
     openings.push({
       id, title, project, url: '', postedAt: '', deadline: '', source: 'sheet', status: '진행중',
       targetTo: Math.max(0, Number(source.targetTo) || 0),
+      toGroup: clean(source.toGroup).replace(/\s+/g, ' '),
       hiredCount: Math.max(0, Number(payload.hiredCounts?.[key]) || 0),
       reason: clean(source.reason),
       approvalUrl: approvalLink(source.approvalUrl),
@@ -99,6 +101,7 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
     })
   }
   openings.sort((a, b) => `${a.project}\u001f${a.title}`.localeCompare(`${b.project}\u001f${b.title}`, 'ko'))
+  groupOpeningsByTo(openings)
   const applications: ApplicationRecord[] = Array.isArray(payload.applications)
     ? payload.applications.flatMap(source => {
       const date = clean(source.date).slice(0, 10)
@@ -124,6 +127,7 @@ export const api = {
     const body = await response.json() as DashboardData & { error?: string }
     if (!Array.isArray(body.openings)) throw new Error(body.error || '대시보드 데이터 형식이 올바르지 않습니다.')
     if (!Array.isArray(body.applications)) body.applications = []
+    groupOpeningsByTo(body.openings)
     return body
   },
 

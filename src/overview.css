@@ -1,9 +1,62 @@
-.operations-layout {
-  grid-template-columns: minmax(330px, .82fr) minmax(460px, 1.18fr);
-}
+.recruiting-operations { container: recruiting-operations / inline-size; }
+.operations-layout.with-offer-overview { grid-template-columns: minmax(180px, .65fr) minmax(230px, .85fr) minmax(350px, 1.35fr); gap: 24px; align-items: stretch; }
+.with-offer-overview .project-share-panel { grid-template-columns: minmax(0, 1fr); align-content: start; justify-items: center; gap: 18px; padding: 4px 0 0; min-width: 0; }
+.with-offer-overview .overview-donut.compact { width: 116px; height: 116px; }
+.with-offer-overview .overview-donut.compact:after { inset: 22px; }
+.with-offer-overview .project-share-list { width: 100%; }
+.with-offer-overview .pipeline-flow-panel { min-width: 0; min-height: 0; padding: 4px 0 0 24px; border-left: 1px solid #e8ebee; }
+.with-offer-overview .pipeline-flow-heading { gap: 10px; flex-wrap: wrap; }
+.with-offer-overview .pipeline-flow-heading>div>span { font-size: 13px; }
+.with-offer-overview .pipeline-flow-heading>div>b { font-size: 18px; }
+.with-offer-overview .pipeline-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.with-offer-overview .pipeline-flow:before { display: none; }
+.with-offer-overview .pipeline-step { min-width: 0; padding: 16px 8px; border: 1px solid #eef0f3; border-radius: 12px; background: #f9fafb; }
+.with-offer-overview .pipeline-step i { display: none; }
+.with-offer-overview .pipeline-step>b { margin-top: 0; font-size: 28px; }
+.with-offer-overview .pipeline-step>span { margin-top: 7px; font-size: 13px; }
+.with-offer-overview .pipeline-offer { background: #edf5ff; border-color: #b9d5fb; }
+.with-offer-overview .pipeline-offer>b, .with-offer-overview .pipeline-offer>span { color: #1b64da; }
 
-@media (max-width: 1200px) {
-  .operations-layout {
-    grid-template-columns: minmax(300px, .9fr) minmax(400px, 1.1fr);
-  }
+.offer-overview { min-width: 0; padding: 18px; border: 1px solid #cfe0f9; border-radius: 15px; background: linear-gradient(180deg, #f5f9ff, #fff 110px); }
+.offer-overview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.offer-section-label { display: flex; align-items: center; gap: 6px; color: #1b64da; font-size: 12px; font-weight: 700; }
+.offer-overview-heading h3 { margin: 6px 0 0; color: #191f28; font-size: 20px; letter-spacing: -.03em; }
+.offer-total { display: flex; align-items: baseline; gap: 4px; color: #1b64da; font-size: 32px; letter-spacing: -.04em; }
+.offer-total small { font-size: 14px; font-weight: 600; }
+.offer-list-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 13px 0 12px; color: #6b7684; font-size: 12px; }
+.offer-list-meta small { white-space: nowrap; font-size: 11px; }
+.offer-list-scroll { max-height: 290px; overflow: auto; scrollbar-width: thin; scrollbar-color: #cad9ed transparent; border-top: 1px solid #e5edf7; }
+.offer-list-scroll:focus-visible { outline: 2px solid #3182f6; outline-offset: 3px; }
+.offer-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.offer-role-column { width: auto; }.offer-name-column { width: 62px; }.offer-date-column { width: 94px; }
+.offer-table th { position: sticky; top: 0; z-index: 1; padding: 10px 4px; background: #f8faff; color: #6b7684; font-size: 11px; text-align: left; font-weight: 600; }
+.offer-table th:first-child, .offer-table td:first-child { padding-left: 0; }
+.offer-table th:last-child, .offer-table td:last-child { padding-right: 0; text-align: right; }
+.offer-table td { padding: 13px 4px; vertical-align: middle; border-bottom: 1px solid #edf1f5; }
+.offer-table tbody tr:last-child td { border-bottom: 0; }
+.offer-project { display: inline-block; margin-bottom: 5px; padding: 3px 6px; border-radius: 5px; background: #edf3fc; color: #35619c; font-size: 11px; font-weight: 700; line-height: 1.2; }
+.offer-opening-link, .offer-opening-title { display: flex; align-items: flex-start; gap: 3px; width: 100%; padding: 0; border: 0; background: transparent; color: #333d4b; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.5; text-align: left; word-break: keep-all; overflow-wrap: anywhere; }
+.offer-opening-link svg { flex: none; margin-top: 3px; color: #8ba9d2; }.offer-opening-link:hover { color: #1b64da; }
+.offer-opening-link:focus-visible { outline: 2px solid #3182f6; outline-offset: 3px; border-radius: 3px; }
+.offer-candidate-name { color: #191f28; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.offer-hire-date { display: block; color: #d9374e; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.offer-hire-date small { display: block; margin-top: 5px; font-size: 11px; font-weight: 600; }
+.offer-date-pending { color: #8b95a1; font-size: 12px; white-space: nowrap; }
+.offer-empty { display: flex; min-height: 200px; flex-direction: column; justify-content: center; align-items: center; gap: 11px; color: #9aafc9; text-align: center; }
+.offer-empty>b { color: #4e5968; font-size: 14px; }.offer-empty>span { color: #8b95a1; font-size: 12px; }
+
+@container recruiting-operations (max-width: 1050px) {
+  .operations-layout.with-offer-overview { grid-template-columns: minmax(220px, .8fr) minmax(350px, 1.2fr); gap: 22px; }
+  .with-offer-overview .project-share-panel { grid-column: 1 / -1; grid-template-columns: 96px minmax(0, 1fr); gap: 24px; padding: 0 0 20px; border-bottom: 1px solid #eef0f2; align-items: center; }
+  .with-offer-overview .overview-donut.compact { width: 92px; height: 92px; }
+  .with-offer-overview .overview-donut.compact:after { inset: 17px; }.with-offer-overview .overview-donut.compact b { font-size: 22px; }
+  .with-offer-overview .project-share-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 22px; row-gap: 12px; }
+  .with-offer-overview .pipeline-flow-panel { border-left: 0; padding: 4px 0 0; }
 }
+@container recruiting-operations (max-width: 640px) {
+  .operations-layout.with-offer-overview { grid-template-columns: minmax(0, 1fr); }
+  .with-offer-overview .project-share-panel { gap: 16px; }.with-offer-overview .project-share-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .with-offer-overview .pipeline-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); }.with-offer-overview .pipeline-step { padding: 14px 3px; }
+  .with-offer-overview .pipeline-step>b { font-size: 24px; }.with-offer-overview .pipeline-step>span { font-size: 11px; }.offer-overview { padding: 16px; }
+}
+@media print { .offer-list-scroll { max-height: none; overflow: visible; }.offer-table th { position: static; }.offer-table tr { break-inside: avoid; } }

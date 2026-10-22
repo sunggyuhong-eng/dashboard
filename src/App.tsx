@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { BarChart3, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCopy, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, TrendingUp, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
+import { OfferOverview } from './OfferOverview'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
 
@@ -273,7 +274,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const goAnalytics = () => setSelectedId(ANALYTICS_ID)
   return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="연동용 시트에서 최신 데이터를 읽어 현재 화면에 바로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '시트 불러오는 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
     <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><button className={`report-link analytics-link ${selectedId === ANALYTICS_ID ? 'active' : ''}`} onClick={goAnalytics}><TrendingUp size={17} /><div><b>지원자 추이</b><small>게임잡·그리팅 지원 현황</small></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · 진행 {opening.candidates.length}명</small></div><ChevronRight size={15} /></button>)}</div></aside>
-      <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} /> : selectedId === ANALYTICS_ID && data ? <ApplicantAnalytics data={data} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} /> : <EmptyState />}</main></div>
+      <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} onSelectOpening={setSelectedId} /> : selectedId === ANALYTICS_ID && data ? <ApplicantAnalytics data={data} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
     {data && <InterviewCalendar openings={data.openings} />}
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
@@ -349,7 +350,7 @@ function ApplicantAnalytics({ data }: { data: DashboardData }) {
   </section>
 }
 
-export function OverviewReport({ data }: { data: DashboardData }) {
+export function OverviewReport({ data, onSelectOpening }: { data: DashboardData; onSelectOpening?: (id: string) => void }) {
   const [reportOpen, setReportOpen] = useState(false)
   const [reportText, setReportText] = useState('')
   const [copied, setCopied] = useState(false)
@@ -389,7 +390,24 @@ export function OverviewReport({ data }: { data: DashboardData }) {
   }
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><ClipboardCopy size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
-    <section className="recruiting-operations"><header><div><span>채용 운영 요약</span><h2>프로젝트 비중과 현재 전형 흐름</h2></div><small>진행 지원자 {candidates.length}명 기준</small></header><div className="operations-layout"><div className="project-share-panel"><div className="overview-donut compact" style={{ background: projectShares.length ? `conic-gradient(${projectShareStops.join(',')})` : '#eef1f4' }}><div><b>{shareUsesTo ? targetTo : active.length}</b><span>{shareUsesTo ? '목표 TO' : '오픈 공고'}</span></div></div><ol className="project-share-list">{projectShares.map((item, index) => { const value = shareUsesTo ? item.targetTo : item.openingCount; const ratio = Math.round((value / projectShareTotal) * 100); return <li key={item.project}><i style={{ background: overviewColors[index % overviewColors.length] }} /><b>{item.project}</b><span>{ratio}%</span><strong>{shareUsesTo ? `${item.targetTo}명` : `${item.openingCount}개`}</strong></li> })}</ol></div><div className="pipeline-flow-panel"><div className="pipeline-flow-heading"><div><span>현재 전형 진행 현황</span><b>주요 전형 {mainPipelineTotal}명</b></div>{otherPipelineTotal > 0 && <small>기타 전형 {otherPipelineTotal}명</small>}</div><div className="pipeline-flow">{pipelineSummary.map((item, index) => <div className="pipeline-step" key={item.label}><i>{index + 1}</i><b>{item.count}명</b><span>{item.label}</span></div>)}</div><p>코딩 테스트부터 오퍼까지 현재 단계별 지원자 흐름입니다.</p></div></div></section>
+    <section className="recruiting-operations">
+      <header><div><span>채용 운영 요약</span><h2>프로젝트 비중과 현재 전형 흐름</h2></div><small>진행 지원자 {candidates.length}명 기준</small></header>
+      <div className="operations-layout with-offer-overview">
+        <div className="project-share-panel">
+          <div className="overview-donut compact" style={{ background: projectShares.length ? `conic-gradient(${projectShareStops.join(',')})` : '#eef1f4' }}><div><b>{shareUsesTo ? targetTo : active.length}</b><span>{shareUsesTo ? '목표 TO' : '오픈 공고'}</span></div></div>
+          <ol className="project-share-list">{projectShares.map((item, index) => {
+            const value = shareUsesTo ? item.targetTo : item.openingCount
+            const ratio = Math.round((value / projectShareTotal) * 100)
+            return <li key={item.project}><i style={{ background: overviewColors[index % overviewColors.length] }} /><b>{item.project}</b><span>{ratio}%</span><strong>{shareUsesTo ? `${item.targetTo}명` : `${item.openingCount}개`}</strong></li>
+          })}</ol>
+        </div>
+        <div className="pipeline-flow-panel">
+          <div className="pipeline-flow-heading"><div><span>현재 전형 진행 현황</span><b>주요 전형 {mainPipelineTotal}명</b></div>{otherPipelineTotal > 0 && <small>기타 전형 {otherPipelineTotal}명</small>}</div>
+          <div className="pipeline-flow">{pipelineSummary.map((item, index) => <div className={`pipeline-step ${item.label === '오퍼' ? 'pipeline-offer' : ''}`} key={item.label}><i>{index + 1}</i><b>{item.count}명</b><span>{item.label}</span></div>)}</div>
+        </div>
+        <OfferOverview openings={active} onSelectOpening={onSelectOpening} />
+      </div>
+    </section>
     <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header>
       <div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead>
         <tbody>{Array.from(projects.entries()).flatMap(([project, projectOpenings]) => {

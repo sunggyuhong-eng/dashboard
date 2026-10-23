@@ -44,6 +44,7 @@ assert.deepEqual(data.openings.map(row => row.title), ['소프트웨어 엔지�
 assert.equal(data.openings[1].approvalUrl, 'https://example.com/two')
 assert.equal(data.candidates[0].firstInterviewDate, '2026-11-19')
 assert.equal(data.candidates[1].hireDate, '2026-12-01')
+assert.equal(Object.hasOwn(data, 'applications'), false)
 const old = read([headers.slice(0, 4), ['MAZE', '소프트웨어 엔지니어', '3', '대체채용']])
 assert.equal(old.openings[0].toGroup, '')
 assert.equal(old.openings[0].approvalUrl, '')

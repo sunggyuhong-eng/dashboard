@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
-import { createSlackReport, OpeningBoard, OverviewReport } from './App'
+import { OpeningBoard, OverviewReport } from './App'
 import { groupOpeningsByProject, groupOpeningsByTo, totalTargetTo } from './headcount'
 
 const payload = () => structuredClone(fixture)
@@ -80,7 +80,10 @@ describe('공유 TO', () => {
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
     expect(html).toContain('(3명)')
     expect(html).toContain('<span>100%</span><strong>3명</strong>')
-    expect(html).toContain('class="to-cell shared-to-cell" rowSpan="2"')
+    expect(html).toContain('class="to-cell" rowSpan="2"')
+    expect(html).not.toContain('개 공고 합산')
+    expect(html).not.toContain('shared-to-row')
+    expect(html).not.toContain('공유 TO')
     expect(html).toContain('class="reason-cell shared-reason-cell" rowSpan="2"')
     expect(html.match(/개발 인력 대체채용/g)).toHaveLength(1)
     expect(html).toContain('1차 면접 1명 진행 중')
@@ -100,21 +103,25 @@ describe('공유 TO', () => {
     const group = groupOpeningsByTo(data.openings)[0]
     expect(group.hiredCount).toBe(2)
     const html = renderToStaticMarkup(<OpeningBoard opening={data.openings[0]} openings={data.openings} />)
-    expect(html).toMatch(/공유 목표 TO<\/span><b>3명/)
-    expect(html).toMatch(/공유 TO 충원 완료<\/span><b>2명/)
-    expect(html).toMatch(/공유 잔여 TO<\/span><b>1명/)
+    expect(html).toMatch(/목표 TO<\/span><b>3명/)
+    expect(html).toMatch(/충원 완료<\/span><b>2명/)
+    expect(html).toMatch(/잔여 TO<\/span><b>1명/)
     expect(html).toMatch(/진행 지원자<\/span><b>2명/)
+    expect(html).not.toContain('shared-to-summary')
     expect(data.openings[1].candidates.every(candidate => !html.includes(candidate.name))).toBe(true)
   })
 
-  it('Slack 문구에는 공유 TO를 한 번만 쓰고 각 직무의 진행상황을 따로 쓴다', async () => {
+  it('공유 TO는 하나의 기준 인원으로 유지하고 세부 직무는 각각 표시한다', async () => {
     const data = await buildLiveDashboard(payload(), null)
-    const report = createSlackReport(data.openings)
-    expect(report.match(/TO 3명/g)).toHaveLength(1)
-    expect(report).toContain('2개 직무 합산')
-    expect(report).toContain('소프트웨어 엔지니어')
-    expect(report).toContain('그래픽스 프로그래머')
-    expect(report).toContain('1차 면접 1명 진행 중')
-    expect(report).toContain('2차 면접 1명 진행 중')
+    const groups = groupOpeningsByTo(data.openings)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].targetTo).toBe(3)
+    expect(groups[0].openings.map(opening => opening.title)).toEqual(expect.arrayContaining([
+      '소프트웨어 엔지니어 모집 (경력 5년 이상)',
+      '그래픽스 프로그래머 모집 (경력 5년 이상)',
+    ]))
+    const html = renderToStaticMarkup(<OverviewReport data={data} />)
+    expect(html).not.toContain('2개 공고 합산')
+    expect(html).not.toContain('지원자 추이')
   })
 })

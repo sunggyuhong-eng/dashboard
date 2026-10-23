@@ -39,13 +39,5 @@ export type DashboardData = {
   openings: Opening[]
   syncedAt: string
   candidateCount: number
-  applications: ApplicationRecord[]
   sheetApiUrl?: string
-}
-
-export type ApplicationRecord = {
-  date: string
-  source: '게임잡' | '그리팅' | string
-  project: string
-  openingTitle: string
 }

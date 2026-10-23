@@ -1,7 +1,5 @@
 from scripts.sync_gamejob import (
     build_dashboard,
-    normalize_application_project,
-    normalize_application_title,
     opening_id,
     opening_key,
 )
@@ -13,12 +11,6 @@ def test_opening_key_normalizes_project_and_title():
 
 def test_opening_id_is_stable_for_same_opening():
     assert opening_id("MAZE", "Dev PM") == opening_id(" maze ", "dev  pm")
-
-
-def test_application_names_are_normalized_for_dashboard_filters():
-    assert normalize_application_project("Project octopus") == "OTPS"
-    assert normalize_application_project("Art Division") == "Art실"
-    assert normalize_application_title("[Project ZERO] Software Engineer 모집") == "소프트웨어 엔지니어 모집"
 
 
 def test_build_dashboard_uses_to_sheet_as_opening_master():
@@ -46,9 +38,7 @@ def test_build_dashboard_uses_to_sheet_as_opening_master():
     assert maze["reason"] == "신규 채용"
     assert maze["hiredCount"] == 1
     assert maze["candidates"][0]["name"] == "지원자A"
-    assert dashboard["applications"] == [
-        {"date": "2026-09-15", "source": "그리팅", "project": "MAZE", "openingTitle": "소프트웨어 엔지니어"}
-    ]
+    assert "applications" not in dashboard
     assert unmatched == 1
 
 

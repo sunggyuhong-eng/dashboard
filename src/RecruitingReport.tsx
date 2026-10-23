@@ -36,19 +36,22 @@ const stageNames: Record<PipelineStage, string> = {
   'Offer': '오퍼',
 }
 
-function openingStatus(opening: Opening) {
-  if (!opening.candidates.length) return ['이력서 검토 중']
-  return PIPELINE_STAGES.filter(stage => opening.candidates.some(candidate => candidate.stage === stage)).map(stage => {
-    const candidates = opening.candidates.filter(candidate => candidate.stage === stage)
-    if (stage === 'Offer') {
-      const details = candidates.map(candidate => {
-        const date = offerDate(candidate.hireDate)
-        return date ? `${candidate.name} ${dateText(date)} 입사 예정` : `${candidate.name} 입사일 미정`
-      })
-      return `${stageNames[stage]} ${candidates.length}명 진행 중${details.length ? ` (${details.join(' · ')})` : ''}`
-    }
-    const suffix = stage === '면접' ? '명' : '명 진행 중'
-    return `${stageNames[stage]} ${candidates.length}${suffix}`
+const stageClasses: Record<PipelineStage, string> = {
+  '온라인 과제': 'task',
+  '코딩테스트': 'coding',
+  '역량검사': 'assessment',
+  '면접': 'interview',
+  '1차 면접': 'interview-first',
+  '2차 면접': 'interview-second',
+  '면접합격': 'interview-pass',
+  '처우단계': 'compensation',
+  'Offer': 'offer',
+}
+
+export function openingStageCounts(opening: Opening) {
+  return PIPELINE_STAGES.flatMap(stage => {
+    const count = opening.candidates.filter(candidate => candidate.stage === stage).length
+    return count ? [{ stage, label: stageNames[stage], count }] : []
   })
 }
 
@@ -82,9 +85,16 @@ function ProjectDetailPage({ project, pageNumber, openingNotes }: {
       <div className="pdf-opening-list">{group.openings.map(opening => {
         const memo = openingNotes.get(opening.id)?.trim()
         const reason = group.reasons.length > 1 ? opening.reason.trim() : ''
+        const stages = openingStageCounts(opening)
         return <article className="pdf-opening-row" key={opening.id}>
           <div className="pdf-opening-main"><h3>{titleText(opening.title)}</h3>{reason && <small className="pdf-opening-reason">{reason}</small>}{memo && <small className="pdf-opening-memo">메모 · {memo}</small>}</div>
-          <div className="pdf-opening-progress"><span>현재 진행</span><ul>{openingStatus(opening).map(status => <li key={status}>{status}</li>)}</ul></div>
+          <div className="pdf-opening-progress">
+            <span>전형별 진행 인원</span>
+            {stages.length ? <div className="pdf-stage-visual" role="img" aria-label={stages.map(item => `${item.label} ${item.count}명`).join(', ')}>
+              <div className="pdf-stage-bar" aria-hidden="true">{stages.map(item => <span key={item.stage} className={`pdf-stage-segment pdf-stage-${stageClasses[item.stage]}`} style={{ flexGrow: item.count }}><b>{item.count}</b></span>)}</div>
+              <div className="pdf-stage-legend">{stages.map(item => <span key={item.stage}><i className={`pdf-stage-swatch pdf-stage-${stageClasses[item.stage]}`} />{item.label}<b>{item.count}명</b></span>)}</div>
+            </div> : <p className="pdf-opening-empty">이력서 검토 중</p>}
+          </div>
         </article>
       })}</div>
     </section>)}</div>

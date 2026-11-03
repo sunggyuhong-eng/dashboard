@@ -27,6 +27,11 @@ def approval_link(value: object) -> str:
         return ""
 
 
+def completed_status(value: object) -> str:
+    status = normalized(value).replace(" ", "")
+    return "마감" if status in {"완료", "종료", "마감", "채용완료"} else "진행중"
+
+
 def opening_key(project: object, title: object) -> str:
     return f"{normalized(project)}\x1f{normalized(title)}"
 
@@ -88,7 +93,7 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
             "deadline": "",
             "source": "sheet",
             "isNew": previous_opening_ids is not None and item_id not in previous_opening_ids,
-            "status": "진행중",
+            "status": completed_status(source.get("status")),
             "project": project,
             "targetTo": max(0, int(float(source.get("targetTo") or 0))),
             "toGroup": " ".join(str(source.get("toGroup") or "").split()),

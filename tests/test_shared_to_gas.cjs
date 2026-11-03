@@ -30,11 +30,11 @@ function read(openingValues) {
   vm.runInContext(code, context)
   return JSON.parse(JSON.stringify(vm.runInContext('dashboard_()', context)))
 }
-const headers = ['프로젝트', '공고명', '채용인원', '채용사유', '채용승인신청서 링크', 'TO 그룹']
+const headers = ['프로젝트', '공고명', '채용인원', '채용사유', '채용승인신청서 링크', 'TO 그룹', '채용 상태']
 const data = read([
   headers,
-  ['MAZE', '[MAZE] 소프트웨어 엔지니어', '3', '대체채용', 'https://example.com/one', ' MAZE-개발-01 '],
-  ['MAZE', '[MAZE] 그래픽스 프로그래머', '3', '대체채용', 'https://example.com/two', 'MAZE-개발-01'],
+  ['MAZE', '[MAZE] 소프트웨어 엔지니어', '3', '대체채용', 'https://example.com/one', ' MAZE-개발-01 ', '진행중'],
+  ['MAZE', '[MAZE] 그래픽스 프로그래머', '3', '대체채용', 'https://example.com/two', 'MAZE-개발-01', '완료'],
 ])
 assert.equal(data.openings.length, 2)
 assert.equal(data.candidates.length, 2)
@@ -42,6 +42,7 @@ assert.deepEqual(data.openings.map(row => row.toGroup), ['MAZE-개발-01', 'MAZE
 assert.deepEqual(data.openings.map(row => row.targetTo), [3, 3])
 assert.deepEqual(data.openings.map(row => row.title), ['소프트웨어 엔지니어', '그래픽스 프로그래머'])
 assert.equal(data.openings[1].approvalUrl, 'https://example.com/two')
+assert.deepEqual(data.openings.map(row => row.status), ['진행중', '마감'])
 assert.equal(data.candidates[0].firstInterviewDate, '2026-11-19')
 assert.equal(data.candidates[1].hireDate, '2026-12-01')
 assert.equal(Object.hasOwn(data, 'applications'), false)
@@ -50,4 +51,9 @@ assert.equal(old.openings[0].toGroup, '')
 assert.equal(old.openings[0].approvalUrl, '')
 const alias = read([headers.slice(0, 4).concat('TO그룹'), ['MAZE', '소프트웨어 엔지니어', '3', '대체채용', '공유01']])
 assert.equal(alias.openings[0].toGroup, '공유01')
-console.log('Apps Script: shared TO, legacy columns, candidate dates and approval links passed (read-only).')
+const fixedColumnStatus = read([
+  ['프로젝트', '공고명', '채용인원', '채용사유', '채용승인신청서 링크', 'TO 그룹', '관리 메모'],
+  ['MAZE', 'QA 담당자', '1', '신규 채용', '', '', '완료'],
+])
+assert.equal(fixedColumnStatus.openings[0].status, '마감')
+console.log('Apps Script: shared TO, G-column lifecycle, legacy columns, dates and approval links passed (read-only).')

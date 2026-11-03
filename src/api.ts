@@ -2,7 +2,7 @@ import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type
 import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
-type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown }
+type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown; status?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
 type SheetPayload = {
   ok?: boolean
@@ -15,6 +15,7 @@ type SheetPayload = {
 
 const clean = (value: unknown) => String(value ?? '').trim()
 const normalized = (value: unknown) => clean(value).replace(/\s+/g, ' ').toLowerCase()
+const isCompleted = (value: unknown) => ['완료', '종료', '마감', '채용완료'].includes(clean(value).replace(/\s+/g, '').toLowerCase())
 const openingKey = (project: unknown, title: unknown) => `${normalized(project)}\u001f${normalized(title)}`
 async function openingId(project: unknown, title: unknown) {
   const input = new TextEncoder().encode(openingKey(project, title))
@@ -76,7 +77,7 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
     const id = await openingId(project, title)
     const key = openingKey(project, title)
     openings.push({
-      id, title, project, url: '', postedAt: '', deadline: '', source: 'sheet', status: '진행중',
+      id, title, project, url: '', postedAt: '', deadline: '', source: 'sheet', status: isCompleted(source.status) ? '마감' : '진행중',
       targetTo: Math.max(0, Number(source.targetTo) || 0),
       toGroup: clean(source.toGroup).replace(/\s+/g, ' '),
       hiredCount: Math.max(0, Number(payload.hiredCounts?.[key]) || 0),

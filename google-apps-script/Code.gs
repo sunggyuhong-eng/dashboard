@@ -56,7 +56,8 @@ function dashboard_() {
       targetTo: number_(openingRow[openingTable.columns.targetTo]),
       toGroup: openingTable.columns.toGroup == null ? '' : clean_(openingRow[openingTable.columns.toGroup]).replace(/\s+/g, ' '),
       reason: clean_(openingRow[openingTable.columns.reason]),
-      approvalUrl: openingTable.approvalLinks[o] || ''
+      approvalUrl: openingTable.approvalLinks[o] || '',
+      status: openingStatus_(openingRow[openingTable.columns.lifecycleStatus == null ? 6 : openingTable.columns.lifecycleStatus])
     });
   }
 
@@ -111,7 +112,8 @@ function openingTable_(sheet) {
     targetTo: ['채용인원', '채용 인원', 'TO', '목표 TO'],
     toGroup: ['TO 그룹', 'TO그룹', '공유 TO 그룹', '공유TO그룹'],
     reason: ['채용사유', '채용 사유', '채용배경', '채용 배경'],
-    approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서']
+    approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서'],
+    lifecycleStatus: ['채용상태', '채용 상태', '진행상태', '진행 상태', '상태']
   };
   for (var r = 0; r < Math.min(values.length, 40); r++) {
     var columns = {};
@@ -138,6 +140,11 @@ function openingTable_(sheet) {
     }
   }
   throw new Error(sheet.getName() + ' 시트에서 프로젝트, 공고명, 채용인원, 채용사유 헤더를 찾지 못했습니다.');
+}
+
+function openingStatus_(value) {
+  var status = clean_(value).replace(/\s+/g, '').toLowerCase();
+  return status === '완료' || status === '종료' || status === '마감' || status === '채용완료' ? '마감' : '진행중';
 }
 
 function table_(sheet, required) {

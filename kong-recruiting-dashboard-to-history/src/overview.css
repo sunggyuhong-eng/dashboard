@@ -1,0 +1,60 @@
+.recruiting-operations { container: recruiting-operations / inline-size; }
+.operations-layout.with-pipeline-list { grid-template-columns: 220px minmax(0, 1fr); gap: 30px; align-items: start; }
+.with-pipeline-list .project-share-panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; justify-items: center; gap: 20px; min-width: 0; padding: 0; }
+.with-pipeline-list .project-share-panel h3 { width: 100%; margin: 0; color: #4e5968; font-size: 14px; font-weight: 700; }
+.with-pipeline-list .overview-donut.compact { width: 116px; height: 116px; }
+.with-pipeline-list .overview-donut.compact:after { inset: 22px; }
+.with-pipeline-list .project-share-list { width: 100%; gap: 12px; }
+.with-pipeline-list .project-share-list li { grid-template-columns: 8px minmax(0, 1fr) 34px 35px; }
+.with-pipeline-list .project-share-list li>b { font-size: 12px; }
+.with-pipeline-list .project-share-list li>strong { font-size: 12px; }
+
+.pipeline-overview { min-width: 0; border-left: 1px solid #e5e8eb; padding-left: 30px; }
+.pipeline-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-bottom: 1px solid #e5e8eb; }
+.pipeline-tabs>button { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; margin-bottom: -1px; padding: 4px 8px 16px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #6b7684; font: inherit; }
+.pipeline-tabs>button>span { font-size: 14px; font-weight: 600; }
+.pipeline-tabs>button>b { display: flex; align-items: baseline; gap: 4px; color: #333d4b; font-size: 29px; line-height: 1.2; font-weight: 750; letter-spacing: -.04em; }
+.pipeline-tabs>button>b>small { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.pipeline-tabs>button[aria-selected="true"] { border-bottom-color: #3182f6; color: #1b64da; }
+.pipeline-tabs>button[aria-selected="true"]>b { color: #1b64da; }
+.pipeline-tabs>button:hover { background: #f8f9fa; }
+.pipeline-tabs>button:focus-visible, .pipeline-list-panel:focus-visible, .pipeline-list-scroll:focus-visible, .pipeline-opening-link:focus-visible { outline: 2px solid #3182f6; outline-offset: 3px; border-radius: 3px; }
+.pipeline-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 0 14px; }
+.pipeline-list-heading h3 { margin: 0; color: #191f28; font-size: 16px; font-weight: 700; }
+.pipeline-list-heading h3>span { margin-left: 5px; color: #6b7684; font-size: 13px; font-weight: 500; }
+.pipeline-list-heading>small { color: #8b95a1; font-size: 11px; white-space: nowrap; }
+.pipeline-list-scroll { max-height: 430px; overflow: auto; scrollbar-width: thin; scrollbar-color: #d5d9df transparent; border-top: 1px solid #eef0f2; }
+.pipeline-candidate-table { width: 100%; min-width: 570px; table-layout: fixed; border-collapse: collapse; }
+.pipeline-project-col { width: 74px; }.pipeline-name-col { width: 88px; }.pipeline-stage-col { width: 88px; }.pipeline-date-col { width: 110px; }
+.pipeline-candidate-table th { position: sticky; top: 0; z-index: 1; padding: 11px 8px; background: #f8f9fa; color: #6b7684; font-size: 12px; text-align: left; font-weight: 500; }
+.pipeline-candidate-table td { padding: 16px 8px; border-bottom: 1px solid #eef0f2; vertical-align: middle; color: #4e5968; font-size: 13px; line-height: 1.6; }
+.pipeline-candidate-table th:first-child, .pipeline-candidate-table td:first-child { padding-left: 8px; }
+.pipeline-candidate-table th:last-child, .pipeline-candidate-table td:last-child { padding-right: 8px; }
+.pipeline-candidate-table tr:last-child td { border-bottom: 0; }
+.pipeline-candidate-table .pipeline-project { color: #4e5968; font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.pipeline-opening-link, .pipeline-opening-title { display: flex; align-items: flex-start; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; color: #333d4b; font: inherit; font-weight: 600; text-align: left; word-break: keep-all; overflow-wrap: anywhere; }
+.pipeline-opening-link svg { flex: none; margin-top: 3px; color: #8b95a1; }.pipeline-opening-link:hover { color: #1b64da; }
+.pipeline-candidate-table .pipeline-candidate-name { color: #191f28; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.pipeline-stage-label { color: #6b7684; font-size: 12px; word-break: keep-all; }
+.pipeline-schedule time { display: block; font-size: 13px; white-space: nowrap; font-weight: 600; }
+.pipeline-schedule time+time { margin-top: 8px; }
+.pipeline-schedule time>small { display: block; margin-top: 3px; color: #8b95a1; font-size: 11px; font-weight: 500; }
+.pipeline-schedule .pipeline-hire-date { color: #d9374e; font-weight: 800; }
+.pipeline-schedule .pipeline-hire-date>small { color: #d9374e; }
+.pipeline-date-pending { color: #8b95a1; font-size: 12px; }
+.pipeline-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 230px; gap: 14px; color: #b0b8c1; }
+.pipeline-empty>b { color: #6b7684; font-size: 14px; font-weight: 500; }
+
+@container recruiting-operations (max-width: 1050px) {
+  .operations-layout.with-pipeline-list { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .with-pipeline-list .project-share-panel { grid-template-columns: 96px minmax(0, 1fr); column-gap: 24px; row-gap: 16px; align-items: center; padding-bottom: 22px; border-bottom: 1px solid #eef0f2; }
+  .with-pipeline-list .project-share-panel h3 { grid-column: 1 / -1; }
+  .with-pipeline-list .overview-donut.compact { width: 92px; height: 92px; }.with-pipeline-list .overview-donut.compact:after { inset: 17px; }.with-pipeline-list .overview-donut.compact b { font-size: 22px; }
+  .with-pipeline-list .project-share-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 22px; row-gap: 12px; }
+  .pipeline-overview { padding-left: 0; border-left: 0; }
+}
+@container recruiting-operations (max-width: 640px) {
+  .with-pipeline-list .project-share-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pipeline-tabs>button>span { font-size: 12px; }.pipeline-tabs>button>b { font-size: 25px; }
+}
+@media print { .pipeline-list-scroll { max-height: none; overflow: visible; }.pipeline-candidate-table { min-width: 0; }.pipeline-candidate-table th { position: static; }.pipeline-candidate-table tr { break-inside: avoid; } }

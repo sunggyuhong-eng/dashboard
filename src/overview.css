@@ -59,6 +59,91 @@
 }
 @media print { .pipeline-list-scroll { max-height: none; overflow: visible; }.pipeline-candidate-table { min-width: 0; }.pipeline-candidate-table th { position: static; }.pipeline-candidate-table tr { break-inside: avoid; } }
 
+/* Wider, single-column dashboard with one project per row. */
+.workspace { display: block; height: auto; min-height: calc(100vh - 108px); }
+.content { min-height: calc(100vh - 108px); padding: 34px clamp(24px, 4vw, 72px); }
+.report-view, .opening-view { width: 100%; max-width: 1840px; min-width: 0; }
+.report-head { align-items: center; }
+.report-head h1 { font-size: clamp(28px, 2.4vw, 38px); }
+.report-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.report-kpis .summary { min-height: 122px; justify-content: flex-start; padding: 24px 28px; border: 0; border-radius: 20px; background: #f2f4f6; box-shadow: none; color: #191f28; }
+.report-kpis .summary div { gap: 8px; }
+.report-kpis .summary span { color: #697482; font-size: 13px; }
+.report-kpis .summary b { font-size: clamp(24px, 2.1vw, 32px); }
+.recruiting-operations { margin-top: 24px; padding: 26px 30px; border: 0; border-radius: 22px; background: #f2f4f6; box-shadow: none; }
+.recruiting-operations>header { padding-bottom: 18px; border-color: #e4e7eb; }
+.recruiting-operations>header h2 { font-size: 22px; }
+.pipeline-overview { padding: 20px 0 0; border-left: 0; }
+.recruiting-operations .pipeline-list-panel { padding: 0 16px 12px; border-radius: 16px; background: #fff; }
+.recruiting-operations .pipeline-tabs { margin: 0 6px; }
+.project-overview { margin-top: 32px; padding: 0; border: 0; background: transparent; }
+.project-overview>header { margin-bottom: 18px; }
+.project-overview>header h2 { margin-top: 6px; font-size: 24px; }
+.project-overview>header p { margin-top: 8px; font-size: 13px; }
+.org-project-list { display: flex; flex-direction: column; gap: 10px; }
+.org-project-row { display: grid; grid-template-columns: minmax(180px, 1.05fr) repeat(3, minmax(88px, .42fr)) minmax(260px, 1.8fr) 18px; align-items: center; gap: 20px; width: 100%; min-width: 0; padding: 18px 22px; border: 0; border-radius: 18px; background: #f2f4f6; color: #333d4b; text-align: left; transition: background .15s, box-shadow .15s; }
+.org-project-row:hover, .org-project-row.active { background: #f7faff; box-shadow: inset 0 0 0 1px #b7d4fb, 0 8px 22px #191f2808; }
+.org-project-name { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.org-project-name strong { overflow: hidden; color: #191f28; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.org-project-name small { color: #7b8794; font-size: 11px; }
+.org-project-stat { display: flex; flex-direction: column; gap: 4px; white-space: nowrap; }
+.org-project-stat small { color: #7b8794; font-size: 11px; }
+.org-project-stat b { color: #202936; font-size: 17px; }
+.org-project-stages { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.org-project-stages>small { color: #8b95a1; font-size: 11px; }
+.org-project-row>svg { color: #8b95a1; transition: transform .15s; }
+.org-project-row.active>svg { transform: rotate(90deg); }
+.org-project-detail { margin-top: 12px; padding: 26px; border: 0; border-radius: 22px; background: #f2f4f6; }
+.org-project-detail>header { align-items: center; }
+.org-project-detail>header h3 { font-size: 24px; }
+.org-date-note { margin: 16px 0 20px; padding: 12px 14px; border-radius: 12px; background: #fff; color: #74808d; font-size: 11px; line-height: 1.6; }
+.org-to-section { margin-top: 22px; }
+.org-to-section>header { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; }
+.org-to-section>header h4 { margin: 0; color: #202936; font-size: 17px; }
+.org-to-section>header small { color: #8b95a1; font-size: 11px; }
+.org-to-group { margin-top: 10px; padding: 18px 20px; border-radius: 16px; background: #fff; }
+.org-to-group.completed { background: #fafbfc; }
+.org-to-metrics { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 22px; padding-bottom: 13px; border-bottom: 1px solid #eef0f2; color: #75808d; font-size: 12px; }
+.org-to-metrics b { margin-left: 4px; color: #202936; font-size: 13px; }
+.org-to-openings { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.org-to-openings>li { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(240px, .8fr) minmax(260px, 1.5fr) auto; align-items: center; gap: 16px; padding: 15px 0; border-bottom: 1px solid #f0f2f4; }
+.org-to-openings>li:last-child { border-bottom: 0; padding-bottom: 0; }
+.org-to-opening-title { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.org-to-opening-title>b { color: #27313d; font-size: 13px; }
+.org-to-opening-title>small { overflow: hidden; color: #8b95a1; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.org-to-dates { display: flex; flex-wrap: wrap; gap: 8px 16px; color: #828d99; font-size: 10px; }
+.org-to-dates span { white-space: nowrap; }
+.org-to-dates b { margin-left: 4px; color: #505b68; font-size: 11px; }
+.org-to-openings .org-stage-breakdown { margin: 0; }
+.org-to-openings .org-opening-link { margin: 0; white-space: nowrap; }
+.org-history { margin-top: 22px; border: 0; background: #fff; }
+@media (max-width: 1200px) {
+  .org-project-row { grid-template-columns: minmax(170px, 1fr) repeat(3, minmax(70px, .35fr)) 18px; gap: 14px; }
+  .org-project-stages { grid-column: 1 / -2; grid-row: 2; }
+  .org-project-row>svg { grid-column: 6; grid-row: 1; justify-self: end; }
+  .org-to-openings>li { grid-template-columns: minmax(170px, 1fr) minmax(220px, .8fr) minmax(220px, 1.2fr); }
+  .org-to-openings .org-opening-link { grid-column: 3; }
+}
+@media (max-width: 760px) {
+  .content { padding: 22px 16px; }
+  .report-head { align-items: flex-start; flex-direction: column; }
+  .report-actions { flex-wrap: wrap; }
+  .report-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .report-kpis .summary { min-height: 96px; padding: 16px; border-radius: 15px; }
+  .report-kpis .summary b { font-size: 24px; }
+  .recruiting-operations { padding: 19px 13px; }
+  .org-project-row { grid-template-columns: repeat(3, minmax(0, 1fr)) 18px; padding: 16px; }
+  .org-project-name { grid-column: 1 / -1; }
+  .org-project-stat { padding-top: 4px; }
+  .org-project-stages { grid-column: 1 / -1; grid-row: auto; }
+  .org-project-row>svg { grid-column: 4; grid-row: 1; }
+  .org-project-detail { padding: 17px; }
+  .org-to-openings>li { grid-template-columns: 1fr; align-items: start; gap: 10px; }
+  .org-to-openings .org-opening-link { grid-column: auto; }
+  .org-history>header { align-items: flex-start; flex-direction: column; }
+  .org-history li { grid-template-columns: 1fr; gap: 5px; }
+}
+
 
 /* Keep all five stages visible on one line at every dashboard width. */
 .pipeline-overview { border-left-color: #e5e8eb; }

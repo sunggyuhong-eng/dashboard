@@ -331,3 +331,14 @@
   .org-to-opening-heading .org-to-dates { align-items: flex-start; text-align: left; }
   .org-to-openings .org-opening-link { grid-column: 1; }
 }
+.org-to-metrics { justify-content: space-between; gap: 16px; }
+.org-to-metrics-main { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 22px; }
+.org-to-date-list { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto; color: #111820; font-size: 14px; line-height: 1.5; text-align: right; }
+.org-to-date-list>span { white-space: nowrap; }
+.org-to-date-list small { color: #111820; font-size: 12px; }
+.org-to-date-list b { margin-left: 4px; color: #111820; font-size: 15px; }
+@media (max-width: 760px) {
+  .org-to-metrics { align-items: flex-start; flex-direction: column; }
+  .org-to-date-list { align-items: flex-start; margin-left: 0; text-align: left; }
+  .org-to-date-list>span { white-space: normal; }
+}

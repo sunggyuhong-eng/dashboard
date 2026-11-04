@@ -295,13 +295,16 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
 
   const renderToGroup = (group: ReturnType<typeof groupOpeningsByTo>[number], isCompleted: boolean) => {
     const stages = PIPELINE_STAGES.map(stage => ({ stage, count: group.openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === stage).length, 0) })).filter(item => item.count)
+    const dateRows = [...new Map(group.openings.map(opening => {
+      const start = formatHistoryDate(hiringStartDate(opening))
+      const finish = isCompleted ? formatHistoryDate(completionDate(opening)) : ''
+      return [`${start}|${finish}`, { opening, start, finish }] as const
+    })).values()]
     return <article className={`org-to-group ${isCompleted ? 'completed' : ''}`} key={`${isCompleted ? 'done' : 'active'}-${group.key}`}>
-      <header className="org-to-metrics"><span className={`org-status ${isCompleted ? 'done' : ''}`}>{isCompleted ? '완료' : '진행 중'}</span><span>목표 TO <b>{group.targetTo}명</b></span></header>
+      <header className="org-to-metrics"><div className="org-to-metrics-main"><span className={`org-status ${isCompleted ? 'done' : ''}`}>{isCompleted ? '완료' : '진행 중'}</span><span>목표 TO <b>{group.targetTo}명</b></span></div><div className="org-to-date-list">{dateRows.map(({ opening, start, finish }) => <span key={`${opening.id}-${start}-${finish}`}>{dateRows.length > 1 && <small>{roleName(opening, selectedProject || opening.project)} · </small>}이력 추적 시작일 <b>{start}</b>{isCompleted && <> · 완료 확인일 <b>{finish}</b></>}</span>)}</div></header>
       <ul className="org-to-openings">{group.openings.map(opening => {
-        const started = hiringStartDate(opening)
-        const finished = completionDate(opening)
         return <li key={opening.id}>
-          <div className="org-to-opening-title"><div className="org-to-opening-heading"><b>{roleName(opening, selectedProject || opening.project)}</b><div className="org-to-dates"><span>이력 추적 시작일 <b>{formatHistoryDate(started)}</b></span>{isCompleted && <span>완료 확인일 <b>{formatHistoryDate(finished)}</b></span>}</div></div><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong><ApprovalLink url={opening.approvalUrl} title={opening.title} /></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
+          <div className="org-to-opening-title"><b>{roleName(opening, selectedProject || opening.project)}</b><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong><ApprovalLink url={opening.approvalUrl} title={opening.title} /></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
           {!isCompleted && <div className="org-stage-breakdown">{stages.length ? PIPELINE_STAGES.flatMap(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return count ? [<span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span>] : [] }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>}
           <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>공고 상세 보기 <ChevronRight size={14} /></button>
         </li>

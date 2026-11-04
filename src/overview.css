@@ -10,7 +10,7 @@
 .with-pipeline-list .project-share-list li>strong { font-size: 12px; }
 
 .pipeline-overview { min-width: 0; border-left: 1px solid #e5e8eb; padding-left: 30px; }
-.pipeline-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-bottom: 1px solid #e5e8eb; }
+.pipeline-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border-bottom: 1px solid #e5e8eb; }
 .pipeline-tabs>button { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; margin-bottom: -1px; padding: 4px 8px 16px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #6b7684; font: inherit; }
 .pipeline-tabs>button>span { font-size: 14px; font-weight: 600; }
 .pipeline-tabs>button>b { display: flex; align-items: baseline; gap: 4px; color: #333d4b; font-size: 29px; line-height: 1.2; font-weight: 750; letter-spacing: -.04em; }
@@ -58,3 +58,55 @@
   .pipeline-tabs>button>span { font-size: 12px; }.pipeline-tabs>button>b { font-size: 25px; }
 }
 @media print { .pipeline-list-scroll { max-height: none; overflow: visible; }.pipeline-candidate-table { min-width: 0; }.pipeline-candidate-table th { position: static; }.pipeline-candidate-table tr { break-inside: avoid; } }
+
+
+/* Keep all five stages visible on one line at every dashboard width. */
+.pipeline-overview { border-left-color: #e5e8eb; }
+.pipeline-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.pipeline-tabs>button { padding-right: 4px; padding-left: 4px; }
+.pipeline-tabs>button>span { white-space: nowrap; font-size: clamp(10px, .83vw, 13px); letter-spacing: -.03em; }
+.pipeline-tabs>button>b { font-size: clamp(21px, 1.75vw, 27px); }
+.pipeline-tabs>button>b>small { font-size: 11px; }
+@container recruiting-operations (max-width: 640px) {
+  .pipeline-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .pipeline-tabs>button { padding: 4px 2px 12px; gap: 7px; }
+  .pipeline-tabs>button>span { font-size: 10px; }
+  .pipeline-tabs>button>b { font-size: 21px; }
+}
+
+/* Match the prior dashboard's light, soft-card visual language while using more of the desktop width. */
+.workspace { grid-template-columns: 276px minmax(0, 1fr); }
+.content { padding: 34px clamp(24px, 3vw, 58px); background: #fff; }
+.report-view, .opening-view { min-width: 0; max-width: 1720px; }
+.recruiting-operations { padding: 26px 30px; border: 0; border-radius: 22px; background: #f2f4f6; box-shadow: none; }
+.recruiting-operations>header { border-color: #e4e7eb; }
+.recruiting-operations>header h2 { font-size: 22px; }
+.recruiting-operations .pipeline-list-panel { padding: 0 16px 12px; border-radius: 16px; background: #fff; }
+.recruiting-operations .pipeline-tabs { margin: 0 6px; }
+.report-kpis .summary { min-height: 130px; border: 0; border-radius: 20px; background: #f2f4f6; box-shadow: none; }
+.report-kpis .summary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px #191f2810; }
+.project-overview { margin-top: 30px; }
+.project-overview>header { margin-bottom: 16px; }
+.org-project-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.org-project-card { padding: 22px; border: 0; border-radius: 22px; background: #f2f4f6; }
+.org-project-card:hover, .org-project-card.active { border: 1px solid #b7d4fb; background: #f7faff; box-shadow: 0 10px 28px #191f2810; }
+.org-project-to { margin-top: 13px; }
+.org-stage-breakdown { display: flex; flex-wrap: wrap; gap: 7px; width: 100%; margin-top: 14px; }
+.org-stage-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 31px; padding: 5px 8px; border: 1px solid #e5e8eb; border-radius: 9px; background: #fff; color: #626d7a; font-size: 10px; white-space: nowrap; }
+.org-stage-chip>i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+.org-stage-chip>b { color: #202936; font-size: 10px; }
+.org-stage-dot-task { background: #41a6f6; }
+.org-stage-dot-coding { background: #3478e5; }
+.org-stage-dot-assessment { background: #24a89a; }
+.org-stage-dot-interview { background: #8065dc; }
+.org-stage-dot-compensation { background: #e59a38; }
+.org-stage-dot-offer { background: #dc5564; }
+.org-stage-none { margin-top: 14px; color: #8b95a1; font-size: 11px; }
+.org-opening-card { border: 0; border-radius: 18px; background: #fff; box-shadow: 0 4px 16px #191f2808; }
+.org-opening-progress .org-stage-breakdown { margin-top: 0; }
+.org-opening-progress .org-stage-chip { background: #f7f8fa; }
+.org-project-detail { border: 0; border-radius: 22px; background: #f2f4f6; }
+.org-history { border: 0; border-radius: 18px; background: #f7f8fa; }
+@media (max-width: 1400px) { .org-project-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1050px) { .org-project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .org-project-grid { grid-template-columns: 1fr; } .content { padding: 22px 16px; } .workspace { grid-template-columns: 220px minmax(0, 1fr); } .recruiting-operations { padding: 18px 14px; } }

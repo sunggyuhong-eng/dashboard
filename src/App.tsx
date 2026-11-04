@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { BarChart3, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Search, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
-import { PipelineOverview, PIPELINE_GROUPS } from './PipelineOverview'
+import { PipelineOverview } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
@@ -288,13 +288,11 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
     shareAngle += ((shareUsesTo ? item.targetTo : item.openingCount) / projectShareTotal) * 360
     return `${overviewColors[index % overviewColors.length]} ${start}deg ${shareAngle}deg`
   })
-  const mainPipelineTotal = candidates.filter(candidate => PIPELINE_GROUPS.some(group => (group.stages as readonly PipelineStage[]).includes(candidate.stage))).length
-  const otherPipelineTotal = Math.max(0, candidates.length - mainPipelineTotal)
   const openReport = () => setReportOpen(true)
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary icon={BriefcaseBusiness} label="오픈 공고" value={`${active.length}개`} /><Summary icon={Target} label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary icon={UsersRound} label="진행 지원자" value={`${candidates.length}명`} /></div>
     <section className="recruiting-operations">
-      <header><div><span>채용 운영 요약</span><h2>현재 전형 진행 현황</h2></div><small>주요 전형 {mainPipelineTotal}명{otherPipelineTotal > 0 && ` · 기타 전형 ${otherPipelineTotal}명`}</small></header>
+      <header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header>
       <div className="operations-layout with-pipeline-list">
         <div className="project-share-panel">
           <h3>{shareUsesTo ? '프로젝트별 목표 TO' : '프로젝트별 공고'}</h3>
@@ -315,8 +313,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         return <button type="button" key={project} className={`org-project-card ${selectedProject === project ? 'active' : ''}`} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
           <span className="org-card-eyebrow">PROJECT</span><strong>{project}</strong><span className="org-project-meta">{activeOpenings.length}개 진행 중 · {projectOpenings.filter(opening => opening.status === '완료').length}개 완료</span>
           <span className="org-project-to">목표 TO <b>{totalTargetTo(projectOpenings)}명</b></span>
-          <span className="org-stage-bar" aria-label={counts.map(item => `${item.stage} ${item.count}명`).join(', ') || '진행 지원자 없음'}>{counts.map(item => <i key={item.stage} className={`org-stage-${stageClass(item.stage)}`} style={{ flexGrow: item.count }} title={`${stageLabel(item.stage)} ${item.count}명`} />)}</span>
-          <span className="org-stage-legend">{counts.length ? counts.map(item => <span key={item.stage}>{stageLabel(item.stage)} <b>{item.count}</b></span>) : <span>진행 중인 지원자 없음</span>}</span>
+          <span className="org-stage-breakdown" aria-label={counts.map(item => `${stageLabel(item.stage)} ${item.count}명`).join(', ') || '진행 지원자 없음'}>{counts.length ? counts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <span className="org-stage-none">진행 중인 지원자 없음</span>}</span>
           <span className="org-card-open">상세 보기 <ChevronRight size={15} /></span>
         </button>
       })}</div>
@@ -325,7 +322,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
           const stages = PIPELINE_STAGES.map(stage => ({ stage, count: opening.candidates.filter(candidate => candidate.stage === stage).length })).filter(item => item.count)
           const totalTo = groupOpeningsByTo(selectedProjectOpenings).find(group => group.openings.some(item => item.id === opening.id))?.targetTo ?? opening.targetTo
           return <article className="org-opening-card" key={opening.id}><div className="org-opening-heading"><div><span className={`org-status ${opening.status === '완료' ? 'done' : ''}`}>{opening.status}</span><h4>{roleName(opening, selectedProject)}</h4><small>{opening.title}</small></div><div className="org-opening-metrics"><span>목표 TO <b>{totalTo || '미입력'}</b></span><span>충원 <b>{opening.hiredCount}</b></span><span>지원자 <b>{opening.candidates.length}</b></span></div></div>
-            <div className="org-opening-progress"><div className="org-stage-bar">{stages.map(item => <i key={item.stage} className={`org-stage-${stageClass(item.stage)}`} style={{ flexGrow: item.count }} title={`${stageLabel(item.stage)} ${item.count}명`} />)}</div><div className="org-stage-legend">{stages.length ? stages.map(item => <span key={item.stage}>{stageLabel(item.stage)} <b>{item.count}명</b></span>) : <span>현재 진행 지원자 없음</span>}</div></div>
+            <div className="org-opening-progress"><div className="org-stage-breakdown">{stages.length ? stages.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div></div>
             {opening.reason && <p className="org-opening-reason">채용 배경 · {opening.reason}</p>}
             <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>지원자 및 공고 상세 보기 <ChevronRight size={14} /></button>
           </article>

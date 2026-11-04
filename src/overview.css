@@ -143,6 +143,8 @@
   .org-history>header { align-items: flex-start; flex-direction: column; }
   .org-history li { grid-template-columns: 1fr; gap: 5px; }
 }
+.org-to-reason-heading { display: flex; align-items: center; gap: 9px; min-height: 30px; }
+.org-to-reason-heading .approval-shortcut { min-height: 30px; margin: 0; padding: 4px 9px; color: #1b64da; font-size: 12px; }
 
 /* Readability and inline project details. */
 .org-project-list { gap: 8px; }

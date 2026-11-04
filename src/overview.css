@@ -316,3 +316,18 @@
   .org-to-openings .org-opening-link { grid-column: 1; }
   .org-to-openings .org-stage-chip { min-height: 42px; }
 }
+.org-to-openings>li { grid-template-columns: minmax(0,1.25fr) minmax(340px,1fr) auto; align-items: start; gap: 24px; }
+.org-to-opening-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.org-to-opening-heading>b { flex: 1; }
+.org-to-opening-heading .org-to-dates { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
+.org-to-openings .org-stage-breakdown { align-self: start; }
+@media (max-width: 1200px) {
+  .org-to-openings>li { grid-template-columns: minmax(0,1fr) minmax(240px,.9fr); gap: 16px; }
+  .org-to-openings .org-opening-link { grid-column: 2; justify-self: start; }
+}
+@media (max-width: 760px) {
+  .org-to-openings>li { grid-template-columns: minmax(0,1fr); }
+  .org-to-opening-heading { flex-direction: column; gap: 8px; }
+  .org-to-opening-heading .org-to-dates { align-items: flex-start; text-align: left; }
+  .org-to-openings .org-opening-link { grid-column: 1; }
+}

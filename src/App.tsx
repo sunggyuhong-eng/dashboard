@@ -301,8 +301,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const started = hiringStartDate(opening)
         const finished = completionDate(opening)
         return <li key={opening.id}>
-          <div className="org-to-opening-title"><b>{roleName(opening, selectedProject || opening.project)}</b><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong><ApprovalLink url={opening.approvalUrl} title={opening.title} /></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
-          <div className="org-to-dates"><span>이력 추적 시작일 <b>{formatHistoryDate(started)}</b></span>{isCompleted && <span>완료 확인일 <b>{formatHistoryDate(finished)}</b></span>}</div>
+          <div className="org-to-opening-title"><div className="org-to-opening-heading"><b>{roleName(opening, selectedProject || opening.project)}</b><div className="org-to-dates"><span>이력 추적 시작일 <b>{formatHistoryDate(started)}</b></span>{isCompleted && <span>완료 확인일 <b>{formatHistoryDate(finished)}</b></span>}</div></div><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong><ApprovalLink url={opening.approvalUrl} title={opening.title} /></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
           {!isCompleted && <div className="org-stage-breakdown">{stages.length ? PIPELINE_STAGES.flatMap(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return count ? [<span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span>] : [] }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>}
           <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>공고 상세 보기 <ChevronRight size={14} /></button>
         </li>
@@ -329,7 +328,14 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
             <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>{currentToGroups.length}건</small></div></header>{currentToGroups.length ? currentToGroups.map(group => renderToGroup(group, false)) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
             <section className="org-to-section"><header><div><h4>완료된 TO</h4><small>{completedToGroups.length}건</small></div></header>{completedToGroups.length ? completedToGroups.map(group => renderToGroup(group, true)) : <p className="org-history-empty">완료된 TO가 없습니다.</p>}</section>
             <section className="org-history"><header><div><span>TO & PIPELINE HISTORY</span><h4>최근 1년 변경 이력</h4></div><small>이 브라우저에서 확인한 변경사항</small></header>
-              {selectedProjectEvents.length ? <ol>{selectedProjectEvents.slice().reverse().map((event, index) => <li key={`${event.openingId}-${event.at}-${index}`}><time>{new Date(event.at).toLocaleString('ko-KR')}</time><b>{event.kind === 'baseline' ? '기록 시작' : event.kind === 'status' ? `상태 변경 · ${event.previousStatus} → ${event.status}` : 'TO / 전형 현황 변경'}</b><span>{roleName({ title: event.title } as Opening, selectedProject)} · 목표 TO {event.snapshot.targetTo || '미입력'}명 · {Object.entries(event.snapshot.stageCounts).map(([stage, count]) => `${stageLabel(stage as PipelineStage)} ${count}명`).join(' · ') || '진행 지원자 없음'}</span></li>)}</ol> : <p className="org-history-empty">이 프로젝트의 기록이 아직 없습니다.</p>}
+              {selectedProjectEvents.length ? <ol>{selectedProjectEvents.slice().reverse().map((event, index) => {
+                const previous = event.previousSnapshot || selectedProjectEvents.filter(item => item.openingId === event.openingId && item.at < event.at).at(-1)?.snapshot
+                const targetChanged = !!previous && previous.targetTo !== event.snapshot.targetTo
+                const targetDelta = targetChanged ? event.snapshot.targetTo - previous!.targetTo : 0
+                const targetChangeText = targetChanged ? `목표 TO ${previous!.targetTo}명 → ${event.snapshot.targetTo}명 (${targetDelta > 0 ? '+' : ''}${targetDelta}명)` : `목표 TO ${event.snapshot.targetTo || '미입력'}명`
+                const eventLabel = event.kind === 'baseline' ? '기록 시작' : targetChanged ? `목표 TO 변경${event.kind === 'status' ? ` · 상태 변경 ${event.previousStatus} → ${event.status}` : ''}` : event.kind === 'status' ? `상태 변경 · ${event.previousStatus} → ${event.status}` : 'TO / 전형 현황 변경'
+                return <li key={`${event.openingId}-${event.at}-${index}`}><time>{new Date(event.at).toLocaleString('ko-KR')}</time><b>{eventLabel}</b><span>{roleName({ title: event.title } as Opening, selectedProject)} · {targetChangeText} · {Object.entries(event.snapshot.stageCounts).map(([stage, count]) => `${stageLabel(stage as PipelineStage)} ${count}명`).join(' · ') || '진행 지원자 없음'}</span></li>
+              })}</ol> : <p className="org-history-empty">이 프로젝트의 기록이 아직 없습니다.</p>}
             </section>
           </section>}
         </div>

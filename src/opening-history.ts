@@ -14,6 +14,7 @@ export type OpeningHistoryEvent = {
   at: string
   kind: 'baseline' | 'status' | 'progress'
   previousStatus?: string
+  previousSnapshot?: OpeningHistorySnapshot
   status: string
   snapshot: OpeningHistorySnapshot
 }
@@ -46,7 +47,7 @@ export function recordOpeningHistory(openings: Opening[], now = new Date(), stor
       history.push({ openingId: opening.id, project: opening.project, title: opening.title, at: stamp, kind: 'baseline', status: opening.status, snapshot })
     } else if (JSON.stringify(last.snapshot) !== serialized) {
       const kind = last.status !== opening.status ? 'status' : 'progress'
-      history.push({ openingId: opening.id, project: opening.project, title: opening.title, at: stamp, kind, previousStatus: last.status, status: opening.status, snapshot })
+      history.push({ openingId: opening.id, project: opening.project, title: opening.title, at: stamp, kind, previousStatus: last.status, previousSnapshot: last.snapshot, status: opening.status, snapshot })
     }
   }
   const cutoff = now.getTime() - 365 * 24 * 60 * 60 * 1000

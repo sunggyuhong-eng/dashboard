@@ -18,6 +18,7 @@ export type PipelineRow = {
   openingId: string
   project: string
   title: string
+  reason: string
   candidate: Candidate
   dates: { label: string; value: string }[]
 }
@@ -48,6 +49,7 @@ export function collectPipelineRows(openings: Opening[], groupId: PipelineGroupI
       openingId: opening.id,
       project: projectName(opening),
       title: opening.title.replace(/^\[[^\]]+\]\s*/, '').trim(),
+      reason: opening.reason || '',
       candidate,
       dates: candidateDates(candidate),
     })),
@@ -91,14 +93,15 @@ export function PipelineOverview({ openings, onSelectOpening }: {
       <header className="pipeline-list-heading"><h3>{current.label} 지원자 <span>{current.rows.length}명</span></h3><small>{selected === 'offer' ? '입사 예정일 순' : '프로젝트 · 직무 순'}</small></header>
       {current.rows.length ? <div className="pipeline-list-scroll" ref={scroll} tabIndex={0} role="region" aria-label={`${current.label} 지원자 목록`}>
         <table className="pipeline-candidate-table">
-          <colgroup><col className="pipeline-project-col" /><col /><col className="pipeline-name-col" /><col className="pipeline-stage-col" />{hasSchedule && <col className="pipeline-date-col" />}</colgroup>
-          <thead><tr><th scope="col">프로젝트</th><th scope="col">채용 직무</th><th scope="col">지원자</th><th scope="col">현재 단계</th>{hasSchedule && <th scope="col">{selected === 'offer' ? '입사 예정일' : '면접 일정'}</th>}</tr></thead>
+          <colgroup><col className="pipeline-project-col" /><col /><col className="pipeline-reason-col" /><col className="pipeline-name-col" /><col className="pipeline-stage-col" />{hasSchedule && <col className="pipeline-date-col" />}</colgroup>
+          <thead><tr><th scope="col">프로젝트</th><th scope="col">채용 직무</th><th scope="col">채용 사유</th><th scope="col">지원자</th><th scope="col">현재 단계</th>{hasSchedule && <th scope="col">{selected === 'offer' ? '예정일' : '면접 일정'}</th>}</tr></thead>
           <tbody>{current.rows.map(row => <tr key={row.key}>
             <td className="pipeline-project">{row.project}</td>
             <td>{onSelectOpening ? <button type="button" className="pipeline-opening-link" onClick={() => onSelectOpening(row.openingId)} aria-label={`${row.project} ${row.title} 공고 보기`}><span>{row.title}</span><ChevronRight size={14} /></button> : <span className="pipeline-opening-title">{row.title}</span>}</td>
+            <td className="pipeline-reason">{row.reason || '채용 사유 미입력'}</td>
             <td className="pipeline-candidate-name">{row.candidate.name || '이름 미입력'}</td>
-            <td><span className="pipeline-stage-label">{stageLabel[row.candidate.stage]}</span></td>
-            {hasSchedule && <td className="pipeline-schedule">{row.dates.length ? row.dates.map(date => <time key={date.label} dateTime={date.value} className={selected === 'offer' ? 'pipeline-hire-date' : ''}>{date.value.replace(/-/g, '.')}<small>{date.label}</small></time>) : <span className="pipeline-date-pending">{selected === 'offer' ? '입사일 미정' : row.candidate.stage === '면접합격' ? '—' : '일정 미정'}</span>}</td>}
+            <td><span className="pipeline-stage-label">{row.candidate.stage === 'Offer' ? '입사 예정' : stageLabel[row.candidate.stage]}</span></td>
+            {hasSchedule && <td className="pipeline-schedule">{row.dates.length ? row.dates.map(date => <time key={date.label} dateTime={date.value} className={selected === 'offer' ? 'pipeline-hire-date' : ''}>{date.value.replace(/-/g, '.')}{selected !== 'offer' && <small>{date.label}</small>}</time>) : <span className="pipeline-date-pending">{selected === 'offer' ? '미정' : row.candidate.stage === '면접합격' ? '—' : '일정 미정'}</span>}</td>}
           </tr>)}</tbody>
         </table>
       </div> : <div className="pipeline-empty"><UsersRound size={25} /><b>{current.label} 진행 중인 지원자가 없습니다.</b></div>}

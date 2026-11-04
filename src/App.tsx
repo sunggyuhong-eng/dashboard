@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Settings2, Target, UsersRound, X } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
 import { PipelineOverview } from './PipelineOverview'
@@ -246,7 +246,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const selected = data?.openings.find(x => x.id === selectedId) || null
   const goHome = () => setSelectedId(REPORT_ID)
   return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="연동용 시트에서 최신 데이터를 읽어 현재 화면에 바로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '시트 불러오는 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
-    <div className="workspace"><main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} onSelectOpening={setSelectedId} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} /> : <EmptyState />}</main></div>
+    <div className="workspace"><main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} onSelectOpening={setSelectedId} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} onBack={goHome} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
     {data && <InterviewCalendar openings={data.openings} />}
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
@@ -271,6 +271,13 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   const hiredCount = groupOpeningsByTo(data.openings).reduce((sum, group) => sum + group.hiredCount, 0)
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
   const allProjects = groupOpeningsByProject(data.openings)
+  const projectOrder = ['ART실', 'GDTS', 'OTPS', 'MAZE', 'HERO', 'ZERO', 'QA', 'SERVER', 'KONG']
+  const orderedProjects = [...allProjects.entries()].sort(([a], [b]) => {
+    const key = (value: string) => value.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
+    const ai = projectOrder.indexOf(key(a))
+    const bi = projectOrder.indexOf(key(b))
+    return (ai < 0 ? projectOrder.length : ai) - (bi < 0 ? projectOrder.length : bi) || a.localeCompare(b, 'ko')
+  })
   const selectedProjectOpenings = selectedProject ? allProjects.get(selectedProject) || [] : []
   const selectedProjectEvents = selectedProject ? projectHistory(historyEvents, selectedProject) : []
   const currentToGroups = groupOpeningsByTo(selectedProjectOpenings.filter(opening => opening.status === '진행중'))
@@ -287,15 +294,14 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   }
 
   const renderToGroup = (group: ReturnType<typeof groupOpeningsByTo>[number], isCompleted: boolean) => {
-    const remaining = Math.max(0, group.targetTo - group.hiredCount)
     const stages = PIPELINE_STAGES.map(stage => ({ stage, count: group.openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === stage).length, 0) })).filter(item => item.count)
     return <article className={`org-to-group ${isCompleted ? 'completed' : ''}`} key={`${isCompleted ? 'done' : 'active'}-${group.key}`}>
-      <header className="org-to-metrics"><span className={`org-status ${isCompleted ? 'done' : ''}`}>{isCompleted ? '완료' : '진행 중'}</span><span>목표 TO <b>{group.targetTo}명</b></span><span>충원 <b>{group.hiredCount}명</b></span><span>잔여 <b>{remaining}명</b></span></header>
+      <header className="org-to-metrics"><span className={`org-status ${isCompleted ? 'done' : ''}`}>{isCompleted ? '완료' : '진행 중'}</span><span>목표 TO <b>{group.targetTo}명</b></span></header>
       <ul className="org-to-openings">{group.openings.map(opening => {
         const started = hiringStartDate(opening)
         const finished = completionDate(opening)
         return <li key={opening.id}>
-          <div className="org-to-opening-title"><b>{roleName(opening, selectedProject || opening.project)}</b><small>{opening.title}</small></div>
+          <div className="org-to-opening-title"><b>{roleName(opening, selectedProject || opening.project)}</b><small>{opening.title}</small><p className="org-to-reason"><strong>채용 사유</strong>{opening.reason || '채용 사유 미입력'}</p></div>
           <div className="org-to-dates"><span>이력 추적 시작일 <b>{formatHistoryDate(started)}</b></span>{isCompleted && <span>완료 확인일 <b>{formatHistoryDate(finished)}</b></span>}</div>
           {!isCompleted && <div className="org-stage-breakdown">{stages.length ? PIPELINE_STAGES.flatMap(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return count ? [<span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span>] : [] }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>}
           <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>공고 상세 보기 <ChevronRight size={14} /></button>
@@ -307,35 +313,35 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="오픈 공고" value={`${active.length}개`} /><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="채용 완료" value={`${hiredCount}명`} /></div>
     <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={active} onSelectOpening={onSelectOpening} /></section>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 진행 중 TO와 완료된 TO 및 기록 날짜를 볼 수 있어요.</p></div></header>
-      <div className="org-project-list">{Array.from(allProjects.entries()).map(([project, projectOpenings]) => {
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 해당 행 바로 아래에서 진행 중 TO와 완료된 TO를 확인할 수 있어요.</p></div></header>
+      <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
         const doneOpenings = projectOpenings.filter(opening => opening.status === '완료')
-        const groups = groupOpeningsByTo(projectOpenings)
-        const projectTarget = groups.reduce((sum, group) => sum + group.targetTo, 0)
-        const projectHired = groups.reduce((sum, group) => sum + group.hiredCount, 0)
-        const projectRemaining = Math.max(0, projectTarget - projectHired)
+        const projectTarget = totalTargetTo(projectOpenings)
         const stageCounts = PIPELINE_STAGES.map(stage => ({ stage, count: activeOpenings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === stage).length, 0) })).filter(item => item.count)
-        return <button type="button" key={project} className={`org-project-row ${selectedProject === project ? 'active' : ''}`} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
-          <span className="org-project-name"><strong>{project}</strong><small>{activeOpenings.length}개 진행 · {doneOpenings.length}개 완료</small></span>
-          <span className="org-project-stat"><small>목표 TO</small><b>{projectTarget}명</b></span><span className="org-project-stat"><small>충원</small><b>{projectHired}명</b></span><span className="org-project-stat"><small>잔여</small><b>{projectRemaining}명</b></span>
-          <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
-        </button>
+        const icon = ['GDTS', 'ZERO'].includes(project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')) ? `${import.meta.env.BASE_URL}${project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR').toLowerCase()}.png` : null
+        return <div className="org-project-entry" key={project}>
+          <button type="button" className={`org-project-row ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
+            <span className="org-project-name">{icon && <img src={icon} alt="" /> }<span><strong>{project}</strong><small>{activeOpenings.length}개 진행 · {doneOpenings.length}개 완료</small></span></span>
+            <span className="org-project-stat"><small>목표 TO</small><b>{projectTarget}명</b></span>
+            <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
+          </button>
+          {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
+            <p className="org-date-note">날짜는 이 대시보드가 현재 브라우저에서 TO를 처음 기록하거나 완료 상태를 확인한 시점입니다. 이전 날짜가 브라우저 기록에 없으면 과거 일자는 표시되지 않습니다.</p>
+            <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>{currentToGroups.length}건</small></div></header>{currentToGroups.length ? currentToGroups.map(group => renderToGroup(group, false)) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
+            <section className="org-to-section"><header><div><h4>완료된 TO</h4><small>{completedToGroups.length}건</small></div></header>{completedToGroups.length ? completedToGroups.map(group => renderToGroup(group, true)) : <p className="org-history-empty">완료된 TO가 없습니다.</p>}</section>
+            <section className="org-history"><header><div><span>TO & PIPELINE HISTORY</span><h4>최근 1년 변경 이력</h4></div><small>이 브라우저에서 확인한 변경사항</small></header>
+              {selectedProjectEvents.length ? <ol>{selectedProjectEvents.slice().reverse().map((event, index) => <li key={`${event.openingId}-${event.at}-${index}`}><time>{new Date(event.at).toLocaleString('ko-KR')}</time><b>{event.kind === 'baseline' ? '기록 시작' : event.kind === 'status' ? `상태 변경 · ${event.previousStatus} → ${event.status}` : 'TO / 전형 현황 변경'}</b><span>{roleName({ title: event.title } as Opening, selectedProject)} · 목표 TO {event.snapshot.targetTo || '미입력'}명 · {Object.entries(event.snapshot.stageCounts).map(([stage, count]) => `${stageLabel(stage as PipelineStage)} ${count}명`).join(' · ') || '진행 지원자 없음'}</span></li>)}</ol> : <p className="org-history-empty">이 프로젝트의 기록이 아직 없습니다.</p>}
+            </section>
+          </section>}
+        </div>
       })}</div>
-      {selectedProject && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
-        <p className="org-date-note">날짜는 이 대시보드가 현재 브라우저에서 TO를 처음 기록하거나 완료 상태를 확인한 시점입니다. 이전 날짜가 브라우저 기록에 없으면 과거 일자는 표시되지 않습니다.</p>
-        <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>{currentToGroups.length}건</small></div></header>{currentToGroups.length ? currentToGroups.map(group => renderToGroup(group, false)) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
-        <section className="org-to-section"><header><div><h4>완료된 TO</h4><small>{completedToGroups.length}건</small></div></header>{completedToGroups.length ? completedToGroups.map(group => renderToGroup(group, true)) : <p className="org-history-empty">완료된 TO가 없습니다.</p>}</section>
-        <section className="org-history"><header><div><span>TO & PIPELINE HISTORY</span><h4>최근 1년 변경 이력</h4></div><small>이 브라우저에서 확인한 변경사항</small></header>
-          {selectedProjectEvents.length ? <ol>{selectedProjectEvents.slice().reverse().map((event, index) => <li key={`${event.openingId}-${event.at}-${index}`}><time>{new Date(event.at).toLocaleString('ko-KR')}</time><b>{event.kind === 'baseline' ? '기록 시작' : event.kind === 'status' ? `상태 변경 · ${event.previousStatus} → ${event.status}` : 'TO / 전형 현황 변경'}</b><span>{roleName({ title: event.title } as Opening, selectedProject)} · TO {event.snapshot.targetTo || '미입력'}명 · 충원 {event.snapshot.hiredCount}명 · {Object.entries(event.snapshot.stageCounts).map(([stage, count]) => `${stageLabel(stage as PipelineStage)} ${count}명`).join(' · ') || '진행 지원자 없음'}</span></li>)}</ol> : <p className="org-history-empty">이 프로젝트의 기록이 아직 없습니다.</p>}
-        </section>
-      </section>}
     </article>
     {reportOpen && <RecruitingReport data={data} openingNotes={new Map(active.map(opening => [opening.id, notes.get(opening.id)?.memo || '']))} onClose={() => setReportOpen(false)} />}
   </section>
 }
 
-export function OpeningBoard({ opening, openings = [opening] }: { opening: Opening; openings?: Opening[] }) {
+export function OpeningBoard({ opening, openings = [opening], onBack }: { opening: Opening; openings?: Opening[]; onBack?: () => void }) {
   const [editing, setEditing] = useState(false)
   const [notice, setNotice] = useState('')
   const [note, setNote] = useState<OpeningNote>(() => loadNote(opening))
@@ -350,7 +356,7 @@ export function OpeningBoard({ opening, openings = [opening] }: { opening: Openi
     window.setTimeout(() => setNotice(''), 2500)
   }
   const toggleStage = (stage: PipelineStage) => setForm(current => ({ ...current, enabledStages: current.enabledStages.includes(stage) ? current.enabledStages.filter(item => item !== stage) : [...current.enabledStages, stage] }))
-  return <section className="opening-view"><div className="opening-head"><div><span className="eyebrow">ACTIVE OPENING{isNewOpening(opening) && <em className="new-badge head-badge">NEW</em>}</span><div className="opening-title-line"><h1>{opening.title}</h1><ApprovalLink url={opening.approvalUrl} title={opening.title} /></div><p>{opening.project || '프로젝트 미지정'}</p></div><button className="outline" onClick={() => { setForm(note); setEditing(true) }}><Settings2 size={16} /> 전형·메모 편집</button></div>
+  return <section className="opening-view"><div className="opening-head"><div><button type="button" className="opening-back outline" onClick={onBack}><ArrowLeft size={16} /> 프로젝트 목록으로</button><span className="eyebrow">ACTIVE OPENING{isNewOpening(opening) && <em className="new-badge head-badge">NEW</em>}</span><div className="opening-title-line"><h1>{opening.title}</h1><ApprovalLink url={opening.approvalUrl} title={opening.title} /></div><p>{opening.project || '프로젝트 미지정'}</p></div><button className="outline" onClick={() => { setForm(note); setEditing(true) }}><Settings2 size={16} /> 전형·메모 편집</button></div>
     <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${group.targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${group.hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${opening.candidates.length}명`} /></div>
     <div className="note-grid"><article className="reason-card"><span>채용 배경</span><p>{opening.reason || '채용 배경 미입력'}</p></article><article className="reason-card"><span>메모</span><p>{note.memo || '이 공고에 대한 메모를 입력해 주세요.'}</p></article></div>
     <div className="board-title"><div><span>HIRING PIPELINE</span><h2>전형 진행 현황</h2></div><p><Clock3 size={14} /> 선택한 전형과 실제 지원자가 있는 단계만 표시합니다.</p></div>

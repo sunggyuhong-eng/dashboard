@@ -144,6 +144,85 @@
   .org-history li { grid-template-columns: 1fr; gap: 5px; }
 }
 
+/* Readability and inline project details. */
+.org-project-list { gap: 8px; }
+.org-project-entry { display: flex; min-width: 0; flex-direction: column; }
+.org-project-row { grid-template-columns: minmax(200px, 1fr) minmax(100px, .36fr) minmax(300px, 1.9fr) 20px; gap: 22px; min-height: 88px; padding: 20px 24px; }
+.org-project-row.active { border-radius: 18px 18px 10px 10px; }
+.org-project-name { flex-direction: row; align-items: center; gap: 13px; }
+.org-project-name>img { width: 40px; height: 40px; flex: none; border-radius: 10px; object-fit: cover; }
+.org-project-name>span { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.org-project-name strong { font-size: 19px; }
+.org-project-name small { font-size: 13px; }
+.org-project-stat small { font-size: 13px; }
+.org-project-stat b { font-size: 19px; }
+.org-project-stages { gap: 8px; }
+.org-project-stages .org-stage-chip { min-height: 36px; padding: 6px 10px; font-size: 12px; }
+.org-project-stages .org-stage-chip>b { font-size: 12px; }
+.org-project-detail { margin: 0 0 7px; padding: 24px 26px 28px; border-radius: 10px 10px 18px 18px; }
+.org-project-detail>header h3 { font-size: 26px; }
+.org-project-detail>header span, .org-history>header span { font-size: 11px; }
+.org-date-note { font-size: 13px; }
+.org-to-section>header h4 { font-size: 19px; }
+.org-to-section>header small { font-size: 13px; }
+.org-to-group { padding: 20px 22px; }
+.org-to-metrics { gap: 12px 22px; font-size: 14px; }
+.org-to-metrics b { font-size: 15px; }
+.org-to-opening-title>b { font-size: 15px; }
+.org-to-opening-title>small { font-size: 12px; }
+.org-to-reason { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 0; color: #515d6a; font-size: 13px; line-height: 1.55; white-space: normal; }
+.org-to-reason strong { color: #717d8a; font-size: 12px; }
+.org-to-dates { gap: 8px 18px; font-size: 12px; }
+.org-to-dates b { font-size: 13px; }
+.org-to-openings .org-opening-link { font-size: 13px; }
+.org-to-openings .org-stage-chip { min-height: 34px; font-size: 12px; }
+.org-to-openings .org-stage-chip>b { font-size: 12px; }
+.org-history { padding: 20px 22px; }
+.org-history>header h4 { font-size: 18px; }
+.org-history>header>small, .org-history li { font-size: 12px; }
+.org-history li { grid-template-columns: 165px minmax(160px,.65fr) minmax(0,1.35fr); }
+.org-history-empty { font-size: 13px; }
+.opening-back { width: fit-content; margin: 0 0 14px; padding: 9px 13px; color: #333d4b; }
+.opening-head h1 { font-size: clamp(30px, 2.5vw, 40px); }
+.reason-card { padding: 24px 26px; }
+.reason-card span { font-size: 14px; }
+.reason-card p { font-size: 16px; line-height: 1.75; }
+.pipeline-candidate-table { min-width: 940px; }
+.pipeline-project-col { width: 92px; }
+.pipeline-reason-col { width: 250px; }
+.pipeline-name-col { width: 110px; }
+.pipeline-stage-col { width: 112px; }
+.pipeline-date-col { width: 105px; }
+.pipeline-candidate-table th { padding: 14px 10px; font-size: 13px; }
+.pipeline-candidate-table td { padding: 17px 10px; font-size: 14px; }
+.pipeline-candidate-table .pipeline-project { font-size: 13px; }
+.pipeline-candidate-table .pipeline-candidate-name { font-size: 15px; }
+.pipeline-reason { color: #5f6b78 !important; font-size: 13px !important; line-height: 1.55 !important; overflow-wrap: anywhere; white-space: normal; }
+.pipeline-stage-label { font-size: 13px; }
+.pipeline-schedule time { font-size: 14px; }
+.pipeline-schedule .pipeline-hire-date { color: #333d4b; font-weight: 700; }
+@media (max-width: 1200px) {
+  .org-project-row { grid-template-columns: minmax(180px,1fr) minmax(90px,.35fr) 20px; gap: 14px; }
+  .org-project-stages { grid-column: 1 / -1; grid-row: 2; }
+  .org-project-row>svg { grid-column: 3; grid-row: 1; justify-self: end; }
+  .org-to-openings>li { grid-template-columns: minmax(180px,1fr) minmax(220px,.9fr) minmax(220px,1.2fr); }
+  .org-to-openings .org-opening-link { grid-column: 3; }
+}
+@media (max-width: 760px) {
+  .org-project-row { grid-template-columns: minmax(0,1fr) 20px; padding: 17px; }
+  .org-project-name { grid-column: 1; }
+  .org-project-stat { grid-column: 1; flex-direction: row; align-items: baseline; gap: 9px; }
+  .org-project-stages { grid-column: 1 / -1; grid-row: auto; }
+  .org-project-row>svg { grid-column: 2; grid-row: 1; }
+  .org-project-detail { padding: 17px; }
+  .org-project-detail>header { align-items: flex-start; }
+  .org-project-detail .org-date-note { font-size: 12px; }
+  .org-to-openings>li { grid-template-columns: minmax(0,1fr); }
+  .org-to-openings .org-opening-link { grid-column: 1; }
+  .org-history li { grid-template-columns: 1fr; gap: 6px; }
+  .pipeline-candidate-table { min-width: 860px; }
+}
+
 
 /* Keep all five stages visible on one line at every dashboard width. */
 .pipeline-overview { border-left-color: #e5e8eb; }

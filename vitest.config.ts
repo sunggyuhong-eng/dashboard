@@ -11,6 +11,8 @@ export default mergeConfig(viteConfig, defineConfig({
       'src/OfferOverview.test.tsx',
       'src/PipelineOverview.test.tsx',
       'src/RecruitingReport.test.tsx',
+      'src/opening-history.test.ts',
+      'src/api-status.test.ts',
     ],
   },
 }))

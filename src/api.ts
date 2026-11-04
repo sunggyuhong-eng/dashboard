@@ -2,7 +2,7 @@ import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type
 import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
-type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown; status?: unknown }
+type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; status?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
 type SheetPayload = {
   ok?: boolean
@@ -15,7 +15,17 @@ type SheetPayload = {
 
 const clean = (value: unknown) => String(value ?? '').trim()
 const normalized = (value: unknown) => clean(value).replace(/\s+/g, ' ').toLowerCase()
-const isCompleted = (value: unknown) => ['완료', '종료', '마감', '채용완료'].includes(clean(value).replace(/\s+/g, '').toLowerCase())
+export function normalizePipelineStage(value: unknown): PipelineStage | null {
+  const stage = clean(value).replace(/\s+/g, '').toLowerCase()
+  const aliases: Record<string, PipelineStage> = {
+    '온라인과제': '온라인 과제', '과제전형': '온라인 과제', 'onlineassignment': '온라인 과제', 'onlineassessment': '온라인 과제',
+    '코딩테스트': '코딩테스트', '코딩과제': '코딩테스트', '역량검사': '역량검사',
+    '면접': '면접', '1차면접': '1차 면접', '2차면접': '2차 면접', '면접합격': '면접합격',
+    '처우단계': '처우단계', '처우협의': '처우단계', 'offer': 'Offer'
+  }
+  return aliases[stage] || (PIPELINE_STAGES.includes(clean(value) as PipelineStage) ? clean(value) as PipelineStage : null)
+}
+const openingStatus = (value: unknown): Opening['status'] => /^(완료|종료|완료됨|closed|done)$/i.test(clean(value).replace(/\s+/g, '')) ? '완료' : '진행중'
 const openingKey = (project: unknown, title: unknown) => `${normalized(project)}\u001f${normalized(title)}`
 async function openingId(project: unknown, title: unknown) {
   const input = new TextEncoder().encode(openingKey(project, title))
@@ -53,14 +63,14 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
   const previousIds = new Set((previous?.openings || []).map(item => item.id))
   const candidatesByOpening = new Map<string, Candidate[]>()
   payload.candidates.forEach((source, index) => {
-    const stage = clean(source.stage)
-    if (!PIPELINE_STAGES.includes(stage as PipelineStage)) return
+    const stage = normalizePipelineStage(source.stage)
+    if (!stage) return
     const key = openingKey(source.project, source.openingTitle)
     const candidate: Candidate = {
       id: clean(source.id) || `row-${clean(source.row) || index + 1}`,
       row: Number(source.row) || index + 1,
       name: clean(source.name),
-      stage: stage as PipelineStage,
+      stage,
       project: clean(source.project),
       openingTitle: clean(source.openingTitle),
       hireDate: clean(source.hireDate),
@@ -77,7 +87,7 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
     const id = await openingId(project, title)
     const key = openingKey(project, title)
     openings.push({
-      id, title, project, url: '', postedAt: '', deadline: '', source: 'sheet', status: isCompleted(source.status) ? '마감' : '진행중',
+      id, title, project, url: '', postedAt: '', deadline: '', source: 'sheet', status: openingStatus(source.status),
       targetTo: Math.max(0, Number(source.targetTo) || 0),
       toGroup: clean(source.toGroup).replace(/\s+/g, ' '),
       hiredCount: Math.max(0, Number(payload.hiredCounts?.[key]) || 0),

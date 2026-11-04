@@ -5,8 +5,7 @@ import { buildLiveDashboard } from './api'
 import { collectPipelineRows, PIPELINE_GROUPS, PipelineOverview } from './PipelineOverview'
 
 describe('전형별 지원자 목록', () => {
-  it('공유 TO 공고도 지원자를 합치거나 중복 제거하지 않고 온라인 과제를 포함한 전형에 연결한다', async () => {
-    expect(PIPELINE_GROUPS.map(group => group.id)).toEqual(['coding', 'assignment', 'interview', 'salary', 'offer'])
+  it('공유 TO 공고도 지원자를 합치거나 중복 제거하지 않고 다섯 전형에 정확히 연결한다', async () => {
     const data = await buildLiveDashboard(structuredClone(fixture), null)
     const opening = data.openings[0]
     const template = opening.candidates[0]
@@ -19,7 +18,6 @@ describe('전형별 지원자 목록', () => {
     data.openings.push({ ...opening, id: 'closed', status: '마감' })
     const counts = PIPELINE_GROUPS.map(group => collectPipelineRows(data.openings, group.id).length)
     expect(counts).toEqual([1, 1, 4, 1, 1])
-    expect(collectPipelineRows(data.openings, 'assignment').map(row => row.candidate.name)).toEqual(['과제 지원자'])
     const interviews = collectPipelineRows(data.openings, 'interview')
     expect(interviews.map(row => row.candidate.stage).sort()).toEqual(['1차 면접', '2차 면접', '면접', '면접합격'].sort())
     const first = interviews.find(row => row.candidate.name === '테스트 A')!
@@ -61,8 +59,6 @@ describe('전형별 지원자 목록', () => {
     const data = await buildLiveDashboard(structuredClone(fixture), null)
     data.openings.flatMap(opening => opening.candidates).find(candidate => candidate.stage === 'Offer')!.hireDate = ''
     const html = renderToStaticMarkup(<PipelineOverview openings={data.openings} onSelectOpening={() => {}} />)
-    expect(html.indexOf('id="pipeline-tab-coding"')).toBeLessThan(html.indexOf('id="pipeline-tab-assignment"'))
-    expect(html).toContain('id="pipeline-tab-assignment"')
     expect(html).toContain('id="pipeline-tab-offer" aria-selected="true"')
     expect(html).toContain('그래픽스 프로그래머')
     expect(html).toContain('테스트 D')

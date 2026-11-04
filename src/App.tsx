@@ -6,7 +6,7 @@ import { PipelineOverview, PIPELINE_GROUPS } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
-import { projectHistoryEvents, readOpeningHistory, reconcileOpeningHistory, writeOpeningHistory, type OpeningHistory, type OpeningHistoryRecord } from './opening-history'
+import { readOpeningHistory, recordOpeningHistory, projectHistory, type OpeningHistoryEvent } from './opening-history'
 
 type OpeningNote = {
   memo: string
@@ -205,13 +205,10 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
-  const [openingHistory, setOpeningHistory] = useState<OpeningHistory>({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [selectedId, setSelectedId] = useState(REPORT_ID)
-  const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [showClosed, setShowClosed] = useState(false)
   const [query, setQuery] = useState('')
   const [refreshNotice, setRefreshNotice] = useState('')
   const load = async () => {
@@ -225,11 +222,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         setRefreshNotice(`최신 시트를 불러오지 못해 마지막 배포 데이터를 표시합니다. ${liveError instanceof Error ? liveError.message : ''}`.trim())
         window.setTimeout(() => setRefreshNotice(''), 7000)
       }
-      const observed = reconcileOpeningHistory(next, readOpeningHistory())
-      writeOpeningHistory(observed.history)
-      setOpeningHistory(observed.history)
-      setData(observed.data)
-      setSelectedId(id => id === REPORT_ID || observed.data.openings.some(x => x.id === id) ? id : REPORT_ID)
+      setData(next)
+      setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
     } catch (e) { setError(e instanceof Error ? e.message : '데이터를 불러오지 못했습니다.') }
     finally { setLoading(false) }
   }
@@ -238,11 +232,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setSyncing(true); setError(''); setRefreshNotice('시트에서 최신 데이터를 불러오고 있어요.')
     try {
       const next = await api.liveDashboard(data)
-      const observed = reconcileOpeningHistory(next, readOpeningHistory())
-      writeOpeningHistory(observed.history)
-      setOpeningHistory(observed.history)
-      setData(observed.data)
-      setSelectedId(id => id === REPORT_ID || observed.data.openings.some(x => x.id === id) ? id : REPORT_ID)
+      setData(next)
+      setSelectedId(id => id === REPORT_ID || next.openings.some(x => x.id === id) ? id : REPORT_ID)
       setRefreshNotice('최신 시트 데이터가 바로 반영됐어요.')
       window.setTimeout(() => setRefreshNotice(''), 4000)
     } catch (e) {
@@ -253,25 +244,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
   useEffect(() => { void load() }, [])
-  const openings = useMemo(() => (data?.openings || []).filter(x => (showClosed ? x.status === '마감' : x.status === '진행중') && `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query, showClosed])
+  const openings = useMemo(() => (data?.openings || []).filter(x => `${x.title} ${x.project}`.toLowerCase().includes(query.toLowerCase())), [data, query])
   const selected = data?.openings.find(x => x.id === selectedId) || null
-  const closedCount = data?.openings.filter(opening => opening.status === '마감').length || 0
-  const goHome = () => { setSelectedProject(null); setSelectedId(REPORT_ID) }
-  const selectProject = (project: string) => { setSelectedProject(project); setSelectedId(REPORT_ID) }
+  const goHome = () => setSelectedId(REPORT_ID)
   return <div className="shell"><header className="topbar"><button className="brand-home" onClick={goHome} aria-label="전체 채용 리포트로 이동"><img src={`${import.meta.env.BASE_URL}kong-studios-logo.png`} alt="KONG STUDIOS" /><span><b>채용 대시보드</b><small>콩스튜디오코리아</small></span></button><nav><button className={syncing ? 'sync-button syncing' : 'sync-button'} onClick={() => void syncNow()} disabled={loading || syncing} title="연동용 시트에서 최신 데이터를 읽어 현재 화면에 바로 반영합니다"><RefreshCw size={16} className={loading || syncing ? 'spin' : ''} /> {syncing ? '시트 불러오는 중' : loading ? '불러오는 중' : '데이터 다시 불러오기'}</button><button className="logout-button" onClick={onLogout}><LogOut size={16} /> 로그아웃</button></nav></header>
-    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID && !selectedProject ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><button type="button" className={`closed-filter ${showClosed ? 'active' : ''}`} onClick={() => { setShowClosed(value => !value); setSelectedProject(null); setSelectedId(REPORT_ID) }}><span>{showClosed ? '진행 중 공고 보기' : '완료된 공고 보기'}</span><b>{showClosed ? data?.openings.filter(opening => opening.status === '진행중').length || 0 : closedCount}</b></button><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => { setSelectedProject(null); setSelectedId(opening.id) }}><span className={`status-dot ${opening.status === '마감' ? 'closed' : ''}`} /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · {opening.status === '마감' ? `완료 · 목표 TO ${openingHistory[opening.id]?.snapshot.targetTo ?? opening.targetTo}명` : `진행 ${opening.candidates.length}명`}</small></div><ChevronRight size={15} /></button>)}</div></aside>
-      <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedProject && data ? <ProjectHistoryView project={selectedProject} data={data} history={openingHistory} onBack={goHome} onSelectOpening={id => { setSelectedProject(null); setSelectedId(id) }} /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} history={openingHistory} onSelectProject={selectProject} onSelectOpening={setSelectedId} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} history={openingHistory[selected.id]} /> : <EmptyState />}</main></div>
+    <div className="workspace"><aside className="opening-sidebar"><div className="sidebar-title"><span>RECRUITING REPORT</span><button className="sidebar-home" onClick={goHome}>채용 현황</button></div><button className={`report-link ${selectedId === REPORT_ID ? 'active' : ''}`} onClick={goHome}><BarChart3 size={17} /><div><b>전체 채용 리포트</b></div><ChevronRight size={15} /></button><label className="search"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="공고·프로젝트 검색" />{query && <button onClick={() => setQuery('')}><X size={14} /></button>}</label><div className="opening-list">{openings.map(opening => <button key={opening.id} className={selectedId === opening.id ? 'active' : ''} onClick={() => setSelectedId(opening.id)}><span className="status-dot" /><div><b>{opening.title}{isNewOpening(opening) && <em className="new-badge">NEW</em>}</b><small>{projectName(opening)} · {opening.status === '완료' ? '완료' : `진행 ${opening.candidates.length}명`}</small></div><ChevronRight size={15} /></button>)}</div></aside>
+      <main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} onSelectOpening={setSelectedId} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
-    {data && <InterviewCalendar openings={data.openings.filter(opening => opening.status === '진행중')} />}
+    {data && <InterviewCalendar openings={data.openings} />}
     <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
   </div>
 }
 
-export function OverviewReport({ data, history = {}, onSelectProject, onSelectOpening }: { data: DashboardData; history?: OpeningHistory; onSelectProject?: (project: string) => void; onSelectOpening?: (id: string) => void }) {
+const stageColorClasses: Record<PipelineStage, string> = { '온라인 과제':'task', '코딩테스트':'coding', '역량검사':'assessment', '면접':'interview', '1차 면접':'interview', '2차 면접':'interview', '면접합격':'interview', '처우단계':'compensation', 'Offer':'offer' }
+const stageDisplayLabels: Record<PipelineStage, string> = { '온라인 과제':'온라인 과제', '코딩테스트':'코딩 테스트', '역량검사':'역량 검사', '면접':'면접', '1차 면접':'1차 면접', '2차 면접':'2차 면접', '면접합격':'면접 합격', '처우단계':'처우 협의', 'Offer':'오퍼' }
+function stageClass(stage: PipelineStage) { return stageColorClasses[stage] }
+function stageLabel(stage: PipelineStage) { return stageDisplayLabels[stage] }
+
+export function OverviewReport({ data, onSelectOpening }: { data: DashboardData; onSelectOpening?: (id: string) => void }) {
   const [reportOpen, setReportOpen] = useState(false)
   const active = data.openings.filter(opening => opening.status === '진행중')
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
   const candidates = active.flatMap(opening => opening.candidates)
+  const [selectedProject, setSelectedProject] = useState<string | null>(null)
+  const [historyEvents, setHistoryEvents] = useState<OpeningHistoryEvent[]>(() => readOpeningHistory())
+  useEffect(() => { setHistoryEvents(recordOpeningHistory(data.openings)) }, [data.openings])
+  const allProjects = groupOpeningsByProject(data.openings)
+  const selectedProjectOpenings = selectedProject ? allProjects.get(selectedProject) || [] : []
+  const selectedProjectEvents = selectedProject ? projectHistory(historyEvents, selectedProject) : []
   const targetTo = totalTargetTo(active)
   const projects = groupOpeningsByProject(active)
   const overviewColors = ['#1b64da', '#3182f6', '#67a5f6', '#8bbdf9', '#8065dc', '#a69af4', '#56b8a7', '#f0a24a']
@@ -302,103 +302,51 @@ export function OverviewReport({ data, history = {}, onSelectProject, onSelectOp
           <ol className="project-share-list">{projectShares.map((item, index) => {
             const value = shareUsesTo ? item.targetTo : item.openingCount
             const ratio = Math.round((value / projectShareTotal) * 100)
-            return <li key={item.project}><i style={{ background: overviewColors[index % overviewColors.length] }} /><button className="project-share-link" type="button" onClick={() => onSelectProject?.(item.project)}>{item.project}</button><span>{ratio}%</span><strong>{shareUsesTo ? `${item.targetTo}명` : `${item.openingCount}개`}</strong></li>
+            return <li key={item.project}><i style={{ background: overviewColors[index % overviewColors.length] }} /><b>{item.project}</b><span>{ratio}%</span><strong>{shareUsesTo ? `${item.targetTo}명` : `${item.openingCount}개`}</strong></li>
           })}</ol>
         </div>
         <PipelineOverview openings={active} onSelectOpening={onSelectOpening} />
       </div>
     </section>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>채용 현황</h2></div></header>
-      <div className="project-status-table-wrap"><table className="project-status-table"><thead><tr><th>프로젝트</th><th>채용 직무</th><th>목표 TO</th><th>채용 배경</th><th>현재 진행</th></tr></thead>
-        <tbody>{Array.from(projects.entries()).flatMap(([project, projectOpenings]) => {
-          const groups = groupOpeningsByTo(projectOpenings)
-          return groups.flatMap((group, groupIndex) => group.openings.map((opening, index) => {
-            const mergeReason = group.shared && group.reasons.length <= 1
-            return <tr key={opening.id}>
-              {groupIndex === 0 && index === 0 && <th className="project-cell" rowSpan={projectOpenings.length}><button type="button" className="project-select" onClick={() => onSelectProject?.(project)} aria-label={`${project} 프로젝트의 채용 히스토리 보기`}><span>{project}</span><small>({totalTargetTo(projectOpenings)}명)</small><em>1년 히스토리 보기 ›</em></button></th>}
-              <td className="role-cell"><b>{roleName(opening, project)}</b>{isNewOpening(opening) && <em className="new-badge">NEW</em>}<ApprovalLink url={opening.approvalUrl} title={opening.title} /></td>
-              {index === 0 && <td className="to-cell" rowSpan={group.openings.length}>
-                <b>{group.targetTo ? `${group.targetTo}명` : '미입력'}</b>
-              </td>}
-              {mergeReason ? index === 0 && <td className="reason-cell shared-reason-cell" rowSpan={group.openings.length}>{group.reasons[0] || '미입력'}</td> : <td className="reason-cell">{opening.reason.trim() || '미입력'}</td>}
-              <td className="progress-cell"><ProgressSituation opening={opening} note={notes.get(opening.id)!} /></td>
-            </tr>
-          }))
-        })}</tbody>
-      </table></div>
+    <article className="project-overview"><header><div><span>ORGANIZATION VIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 직무별 TO와 전형 진행 상황, 최근 1년 기록을 확인할 수 있어요.</p></div></header>
+      <div className="org-project-grid">{Array.from(allProjects.entries()).map(([project, projectOpenings]) => {
+        const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
+        const counts = PIPELINE_STAGES.map(stage => ({ stage, count: activeOpenings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === stage).length, 0) })).filter(item => item.count)
+        return <button type="button" key={project} className={`org-project-card ${selectedProject === project ? 'active' : ''}`} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
+          <span className="org-card-eyebrow">PROJECT</span><strong>{project}</strong><span className="org-project-meta">{activeOpenings.length}개 진행 중 · {projectOpenings.filter(opening => opening.status === '완료').length}개 완료</span>
+          <span className="org-project-to">목표 TO <b>{totalTargetTo(projectOpenings)}명</b></span>
+          <span className="org-stage-bar" aria-label={counts.map(item => `${item.stage} ${item.count}명`).join(', ') || '진행 지원자 없음'}>{counts.map(item => <i key={item.stage} className={`org-stage-${stageClass(item.stage)}`} style={{ flexGrow: item.count }} title={`${stageLabel(item.stage)} ${item.count}명`} />)}</span>
+          <span className="org-stage-legend">{counts.length ? counts.map(item => <span key={item.stage}>{stageLabel(item.stage)} <b>{item.count}</b></span>) : <span>진행 중인 지원자 없음</span>}</span>
+          <span className="org-card-open">상세 보기 <ChevronRight size={15} /></span>
+        </button>
+      })}</div>
+      {selectedProject && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
+        <div className="org-opening-list">{selectedProjectOpenings.map(opening => {
+          const stages = PIPELINE_STAGES.map(stage => ({ stage, count: opening.candidates.filter(candidate => candidate.stage === stage).length })).filter(item => item.count)
+          const totalTo = groupOpeningsByTo(selectedProjectOpenings).find(group => group.openings.some(item => item.id === opening.id))?.targetTo ?? opening.targetTo
+          return <article className="org-opening-card" key={opening.id}><div className="org-opening-heading"><div><span className={`org-status ${opening.status === '완료' ? 'done' : ''}`}>{opening.status}</span><h4>{roleName(opening, selectedProject)}</h4><small>{opening.title}</small></div><div className="org-opening-metrics"><span>목표 TO <b>{totalTo || '미입력'}</b></span><span>충원 <b>{opening.hiredCount}</b></span><span>지원자 <b>{opening.candidates.length}</b></span></div></div>
+            <div className="org-opening-progress"><div className="org-stage-bar">{stages.map(item => <i key={item.stage} className={`org-stage-${stageClass(item.stage)}`} style={{ flexGrow: item.count }} title={`${stageLabel(item.stage)} ${item.count}명`} />)}</div><div className="org-stage-legend">{stages.length ? stages.map(item => <span key={item.stage}>{stageLabel(item.stage)} <b>{item.count}명</b></span>) : <span>현재 진행 지원자 없음</span>}</div></div>
+            {opening.reason && <p className="org-opening-reason">채용 배경 · {opening.reason}</p>}
+            <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>지원자 및 공고 상세 보기 <ChevronRight size={14} /></button>
+          </article>
+        })}</div>
+        <section className="org-history"><header><div><span>TO & PIPELINE HISTORY</span><h4>최근 1년 채용 기록</h4></div><small>현재 브라우저에서 시트를 불러온 뒤 확인된 변경사항</small></header>
+          {selectedProjectEvents.length ? <ol>{selectedProjectEvents.slice().reverse().map((event, index) => <li key={`${event.openingId}-${event.at}-${index}`}><time>{new Date(event.at).toLocaleString('ko-KR')}</time><b>{event.kind === 'baseline' ? '기록 시작' : event.kind === 'status' ? `상태 변경 · ${event.previousStatus} → ${event.status}` : 'TO / 전형 현황 변경'}</b><span>{roleName({ title: event.title } as Opening, selectedProject)} · TO {event.snapshot.targetTo || '미입력'}명 · 충원 {event.snapshot.hiredCount}명 · {Object.entries(event.snapshot.stageCounts).map(([stage, count]) => `${stageLabel(stage as PipelineStage)} ${count}명`).join(' · ') || '진행 지원자 없음'}</span></li>)}</ol> : <p className="org-history-empty">이 프로젝트의 기록이 아직 없습니다. 대시보드가 변경사항을 처음 확인하면 기준 기록을 저장하고, 이후 변경을 여기에 이어서 표시합니다.</p>}
+        </section>
+      </section>}
     </article>
     {reportOpen && <RecruitingReport data={data} openingNotes={new Map(active.map(opening => [opening.id, notes.get(opening.id)?.memo || '']))} onClose={() => setReportOpen(false)} />}
   </section>
 }
 
-export function ProjectHistoryView({ project, data, history, onBack, onSelectOpening }: {
-  project: string
-  data: DashboardData
-  history: OpeningHistory
-  onBack: () => void
-  onSelectOpening: (id: string) => void
-}) {
-  const openings = data.openings.filter(opening => projectName(opening) === project)
-  const activeOpenings = openings.filter(opening => opening.status === '진행중')
-  const completedOpenings = openings.filter(opening => opening.status === '마감')
-  const events = projectHistoryEvents(history, project)
-  const activeTo = totalTargetTo(activeOpenings)
-  return <section className="project-history-view">
-    <button type="button" className="project-history-back" onClick={onBack}><ChevronLeft size={17} /> 전체 채용 현황</button>
-    <header className="project-history-heading"><div><span className="eyebrow">PROJECT · LAST 12 MONTHS</span><h1>{project} 채용 히스토리</h1><p>최근 365일 중 이 브라우저에 기록된 TO·전형 변화</p></div><time>기준 {new Date(data.syncedAt).toLocaleDateString('ko-KR')}</time></header>
-    <div className="project-history-kpis"><Summary icon={BriefcaseBusiness} label="진행 중 공고" value={`${activeOpenings.length}개`} /><Summary icon={Check} label="완료 공고" value={`${completedOpenings.length}개`} /><Summary icon={Target} label="진행 중 목표 TO" value={`${activeTo}명`} /><Summary icon={UsersRound} label="진행 지원자" value={`${activeOpenings.reduce((sum, opening) => sum + opening.candidates.length, 0)}명`} /></div>
-    <section className="project-history-openings"><header><div><span>OPENINGS</span><h2>프로젝트 채용 직무</h2></div><small>{openings.length}개 직무</small></header>
-      {openings.length ? <div className="project-history-opening-list">{openings.map(opening => {
-        const latest = history[opening.id]?.snapshot
-        const stages = PIPELINE_STAGES.flatMap(stage => {
-          const count = latest?.stageCounts[stage] ?? opening.candidates.filter(candidate => candidate.stage === stage).length
-          return count ? [{ stage, count }] : []
-        })
-        return <article className="project-history-opening" key={opening.id}>
-          <header><div><span className={opening.status === '마감' ? 'project-completed-tag' : 'project-active-tag'}>{opening.status === '마감' ? '완료' : '진행 중'}</span><h3>{roleName(opening, project)}</h3><small>{opening.title}</small></div><button type="button" className="outline" onClick={() => onSelectOpening(opening.id)}>공고 상세 보기 <ChevronRight size={14} /></button></header>
-          <div className="project-history-opening-metrics"><span>목표 TO <b>{latest?.targetTo ?? opening.targetTo}명</b></span><span>충원 <b>{latest?.hiredCount ?? opening.hiredCount}명</b></span><span>지원자 <b>{latest?.candidateCount ?? opening.candidates.length}명</b></span></div>
-          <div className="project-history-stage-list">{stages.length ? stages.map(({ stage, count }) => <span key={stage}>{reportStageLabel[stage]} <b>{count}명</b></span>) : <small>진행 지원자 없음 · 이력서 검토 중</small>}</div>
-        </article>
-      })}</div> : <div className="project-history-empty">이 프로젝트의 공고가 없습니다.</div>}
-    </section>
-    <section className="project-history-timeline"><header><div><span>TO & PIPELINE CHANGES</span><h2>최근 1년 히스토리</h2></div><small>저장된 기록 {events.length}건</small></header>
-      {events.length ? <ol>{events.map(({ openingId, title: openingTitle, event }, index) => {
-        const changes = PIPELINE_STAGES.flatMap(stage => { const count = event.snapshot.stageCounts[stage] || 0; return count ? [{ stage, count }] : [] })
-        const eventTitle = event.kind === 'status' ? `${event.previousStatus === '종료' ? '완료' : '진행중'} → ${event.status === '종료' ? '완료' : '진행중'}` : event.kind === 'removed' ? '공고를 완료 이력으로 보관' : index === events.length - 1 ? '최초 기록' : 'TO·전형 현황 변경'
-        return <li key={`${openingId}:${event.at}:${index}`}><i className={`history-marker ${event.kind}`} /><article><header><div><b>{eventTitle}</b><span>{roleName({ title: openingTitle } as Opening, project)}</span></div><time>{openingHistoryDate(event.at)}</time></header><div className="history-metrics"><span>목표 TO <b>{event.snapshot.targetTo}명</b></span><span>충원 <b>{event.snapshot.hiredCount}명</b></span><span>잔여 <b>{Math.max(0, event.snapshot.targetTo - event.snapshot.hiredCount)}명</b></span><span>지원자 <b>{event.snapshot.candidateCount}명</b></span></div>{changes.length ? <div className="history-stages">{changes.map(({ stage, count }) => <span key={stage}>{reportStageLabel[stage]} <b>{count}명</b></span>)}</div> : <small className="history-empty">전형 지원자 없음</small>}</article></li>
-      })}</ol> : <div className="project-history-empty">이 브라우저에 최근 1년 기록이 없습니다. 시트에서 TO·전형 또는 G열 상태를 변경한 뒤 `데이터 다시 불러오기`를 누르면 변경 이력이 쌓입니다.</div>}
-    </section>
-  </section>
-}
-
-const reportStageLabel: Record<PipelineStage, string> = {
-  '온라인 과제': '온라인 과제', '코딩테스트': '코딩 테스트', '역량검사': '역량 검사', '면접': '면접',
-  '1차 면접': '1차 면접', '2차 면접': '2차 면접', '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼',
-}
-
-function openingHistoryDate(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
-
-export function OpeningBoard({ opening, openings = [opening], history }: {
-  opening: Opening
-  openings?: Opening[]
-  history?: OpeningHistoryRecord
-}) {
+export function OpeningBoard({ opening, openings = [opening] }: { opening: Opening; openings?: Opening[] }) {
   const [editing, setEditing] = useState(false)
   const [notice, setNotice] = useState('')
   const [note, setNote] = useState<OpeningNote>(() => loadNote(opening))
   const [form, setForm] = useState<OpeningNote>(() => loadNote(opening))
   useEffect(() => { const next = loadNote(opening); setNote(next); setForm(next); setEditing(false) }, [opening])
-  const isClosed = opening.status === '마감'
-  const toGroupOpenings = isClosed ? [opening] : openings.filter(item => item.status === '진행중')
-  const group = groupOpeningsByTo(toGroupOpenings).find(group => group.openings.some(item => item.id === opening.id)) || groupOpeningsByTo([opening])[0]
-  const historySnapshot = history?.snapshot
-  const targetTo = isClosed ? historySnapshot?.targetTo ?? group.targetTo : group.targetTo
-  const hiredCount = isClosed ? historySnapshot?.hiredCount ?? group.hiredCount : group.hiredCount
-  const displayedCandidateCount = isClosed ? historySnapshot?.candidateCount ?? opening.candidates.length : opening.candidates.length
-  const remaining = Math.max(0, targetTo - hiredCount)
+  const group = groupOpeningsByTo(openings).find(group => group.openings.some(item => item.id === opening.id)) || groupOpeningsByTo([opening])[0]
+  const remaining = Math.max(0, group.targetTo - group.hiredCount)
   const visibleStages = stagesFor(opening, note)
   const save = () => {
     const next = { ...form, enabledStages: PIPELINE_STAGES.filter(stage => form.enabledStages.includes(stage)) }
@@ -406,13 +354,11 @@ export function OpeningBoard({ opening, openings = [opening], history }: {
     window.setTimeout(() => setNotice(''), 2500)
   }
   const toggleStage = (stage: PipelineStage) => setForm(current => ({ ...current, enabledStages: current.enabledStages.includes(stage) ? current.enabledStages.filter(item => item !== stage) : [...current.enabledStages, stage] }))
-  return <section className="opening-view"><div className="opening-head"><div><span className="eyebrow">{isClosed ? 'COMPLETED OPENING' : 'ACTIVE OPENING'}{isNewOpening(opening) && <em className="new-badge head-badge">NEW</em>}</span><div className="opening-title-line"><h1>{opening.title}</h1><ApprovalLink url={opening.approvalUrl} title={opening.title} /></div><p>{opening.project || '프로젝트 미지정'}{isClosed && <span className="closed-label">채용 완료</span>}</p></div><div className="opening-head-actions">{!isClosed && <button className="outline" onClick={() => { setForm(note); setEditing(true) }}><Settings2 size={16} /> 전형·메모 편집</button>}</div></div>
-    {isClosed && <div className="archived-notice"><b>완료 공고의 이력</b><span>연동 시트 G열의 완료 표시를 기준으로 이 공고를 보관하고 있습니다.</span></div>}
-    <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="기록된 진행 지원자" value={`${displayedCandidateCount}명`} /></div>
+  return <section className="opening-view"><div className="opening-head"><div><span className="eyebrow">ACTIVE OPENING{isNewOpening(opening) && <em className="new-badge head-badge">NEW</em>}</span><div className="opening-title-line"><h1>{opening.title}</h1><ApprovalLink url={opening.approvalUrl} title={opening.title} /></div><p>{opening.project || '프로젝트 미지정'}</p></div><button className="outline" onClick={() => { setForm(note); setEditing(true) }}><Settings2 size={16} /> 전형·메모 편집</button></div>
+    <div className="summary-grid"><Summary icon={Target} label="목표 TO" value={`${group.targetTo}명`} /><Summary icon={Check} label="충원 완료" value={`${group.hiredCount}명`} /><Summary icon={BriefcaseBusiness} label="잔여 TO" value={`${remaining}명`} accent /><Summary icon={UsersRound} label="진행 지원자" value={`${opening.candidates.length}명`} /></div>
     <div className="note-grid"><article className="reason-card"><span>채용 배경</span><p>{opening.reason || '채용 배경 미입력'}</p></article><article className="reason-card"><span>메모</span><p>{note.memo || '이 공고에 대한 메모를 입력해 주세요.'}</p></article></div>
-    {!isClosed && <><div className="board-title"><div><span>HIRING PIPELINE</span><h2>전형 진행 현황</h2></div><p><Clock3 size={14} /> 선택한 전형과 실제 지원자가 있는 단계만 표시합니다.</p></div>
-    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><div className="candidate-name"><b>{candidate.name}</b>{candidate.stage === 'Offer' && candidate.hireDate && <strong className="hire-date">› {formatKoreanDate(candidate.hireDate)} 입사 예정</strong>}</div><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div></>}
-    <section className="opening-history-panel"><header><div><span>TO HISTORY</span><h2>TO · 채용 진행 이력</h2></div><small>시트 데이터를 불러온 시점의 변경 사항을 기록합니다</small></header>{history?.events.length ? <ol>{[...history.events].reverse().map((event, index) => { const counts = PIPELINE_STAGES.flatMap(stage => { const count = event.snapshot.stageCounts[stage] || 0; return count ? [{ stage, count }] : [] }); const title = event.kind === 'status' ? `${event.previousStatus === '종료' ? '완료' : '진행중'} → ${event.status === '종료' ? '완료' : '진행중'}` : event.kind === 'removed' ? '시트에서 빠져 완료 이력으로 보관' : index === history.events.length - 1 ? '최초 기록' : '시트 데이터 변경'; return <li key={`${event.at}-${event.kind}-${index}`}><span className={`history-marker ${event.kind}`} /><article><header><b>{title}</b><time>{openingHistoryDate(event.at)}</time></header><div className="history-metrics"><span>목표 TO <b>{event.snapshot.targetTo}명</b></span><span>충원 <b>{event.snapshot.hiredCount}명</b></span><span>잔여 <b>{Math.max(0, event.snapshot.targetTo - event.snapshot.hiredCount)}명</b></span><span>진행 지원자 <b>{event.snapshot.candidateCount}명</b></span></div>{counts.length ? <div className="history-stages">{counts.map(({ stage, count }) => <span key={stage}>{reportStageLabel[stage]} <b>{count}명</b></span>)}</div> : <small className="history-empty">전형 진행 지원자 없음</small>}</article></li> })}</ol> : <div className="history-empty-state">이 브라우저에 저장된 이력이 아직 없습니다. 시트 데이터를 불러오면 현재 TO와 전형 현황부터 기록됩니다.</div>}</section>
+    <div className="board-title"><div><span>HIRING PIPELINE</span><h2>전형 진행 현황</h2></div><p><Clock3 size={14} /> 선택한 전형과 실제 지원자가 있는 단계만 표시합니다.</p></div>
+    <div className="kanban" style={{ gridTemplateColumns: `repeat(${Math.max(visibleStages.length, 1)}, 244px)` }}>{visibleStages.map(stage => { const candidates = opening.candidates.filter(x => x.stage === stage); return <section className="lane" key={stage}><header><b>{stage}</b><span>{candidates.length}</span></header><div className="lane-body">{candidates.map(candidate => <article className="candidate" key={candidate.id}><div className="candidate-name"><b>{candidate.name}</b>{candidate.stage === 'Offer' && candidate.hireDate && <strong className="hire-date">› {formatKoreanDate(candidate.hireDate)} 입사 예정</strong>}</div><small>{candidate.project || opening.project || '프로젝트 미지정'}</small></article>)}{!candidates.length && <div className="lane-empty">지원자 없음</div>}</div></section> })}</div>
     {notice && <div className="toast">{notice}</div>}
     {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(false)}><section className="modal wide-modal" onMouseDown={e => e.stopPropagation()}><header><div><span>LOCAL OPENING SETTINGS</span><h2>전형·메모</h2></div><button onClick={() => setEditing(false)}><X /></button></header><p className="local-help">목표 TO와 채용 배경은 연동용 사본의 Dashboard_TO 탭에서 불러옵니다. 전형 설정과 메모만 현재 브라우저에 저장됩니다.</p><fieldset className="stage-selector"><legend>사용 전형</legend><p>직무에 맞는 단계만 선택하세요. 실제 지원자가 있는 단계는 선택을 해제해도 화면에 유지됩니다.</p><div>{PIPELINE_STAGES.map(stage => <label key={stage}><input type="checkbox" checked={form.enabledStages.includes(stage)} onChange={() => toggleStage(stage)} /><span>{stage}</span></label>)}</div></fieldset><label>메모<textarea rows={3} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} /></label><div className="modal-actions"><button className="outline" onClick={() => setEditing(false)}>취소</button><button className="primary" onClick={save}>이 브라우저에 저장</button></div></section></div>}
   </section>

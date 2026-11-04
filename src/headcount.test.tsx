@@ -72,28 +72,27 @@ describe('공유 TO', () => {
     expect([...groupOpeningsByProject(data.openings).keys()]).toEqual(['OTPS'])
   })
 
-  it('화면 합계·프로젝트·원 그래프는 3명, 표는 TO와 공통 배경만 병합한다', async () => {
+  it('프로젝트별 카드에 TO와 전형 현황을 직관적으로 표시한다', async () => {
     const data = await buildLiveDashboard(payload(), null)
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/오픈 공고<\/span><b>2개/)
     expect(html).toMatch(/목표 TO<\/span><b>3명/)
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
-    expect(html).toContain('(3명)')
+    expect(html).toContain('ORGANIZATION VIEW')
+    expect(html).toContain('프로젝트별 채용 현황')
+    expect(html).toContain('MAZE')
+    expect(html).toContain('목표 TO <b>3명</b>')
     expect(html).toContain('<span>100%</span><strong>3명</strong>')
-    expect(html).toContain('class="to-cell" rowSpan="2"')
+    expect(html).not.toContain('project-status-table')
     expect(html).not.toContain('개 공고 합산')
     expect(html).not.toContain('shared-to-row')
     expect(html).not.toContain('공유 TO')
-    expect(html).toContain('class="reason-cell shared-reason-cell" rowSpan="2"')
-    expect(html.match(/개발 인력 대체채용/g)).toHaveLength(1)
-    expect(html).toContain('1차 면접 1명 진행 중')
-    expect(html).toContain('2차 면접 1명 진행 중')
-    expect(html).toContain('오퍼 1명 진행 중')
+    expect(html).toContain('코딩 테스트')
+    expect(html).toContain('오퍼')
     const differing = structuredClone(data)
     differing.openings[0].reason = '별도 세부 사유'
     const differingHtml = renderToStaticMarkup(<OverviewReport data={differing} />)
-    expect(differingHtml).not.toContain('class="reason-cell shared-reason-cell"')
-    expect(differingHtml).toContain('별도 세부 사유')
+    expect(differingHtml).not.toContain('project-status-table')
   })
 
   it('상세 화면은 공유 충원·잔여 TO와 선택 공고의 지원자만 표시한다', async () => {

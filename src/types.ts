@@ -24,7 +24,7 @@ export type Opening = {
   url: string
   postedAt: string
   deadline: string
-  status: '진행중' | '마감'
+  status: '진행중' | '완료' | '마감'
   targetTo: number
   toGroup?: string
   hiredCount: number

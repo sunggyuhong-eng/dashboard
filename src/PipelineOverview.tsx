@@ -5,8 +5,8 @@ import { offerDate } from './OfferOverview'
 import type { Candidate, Opening, PipelineStage } from './types'
 
 export const PIPELINE_GROUPS = [
+  { id: 'task', label: '온라인 과제', stages: ['온라인 과제'] },
   { id: 'coding', label: '코딩 테스트', stages: ['코딩테스트'] },
-  { id: 'assignment', label: '온라인 과제', stages: ['온라인 과제'] },
   { id: 'interview', label: '면접', stages: ['면접', '1차 면접', '2차 면접', '면접합격'] },
   { id: 'salary', label: '처우 협의', stages: ['처우단계'] },
   { id: 'offer', label: '오퍼', stages: ['Offer'] },

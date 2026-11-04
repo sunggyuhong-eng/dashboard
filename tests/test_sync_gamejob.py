@@ -57,18 +57,6 @@ def test_build_dashboard_keeps_opening_without_active_candidates():
     assert unmatched == 0
 
 
-def test_build_dashboard_maps_sheet_completion_marker_to_archived_status():
-    sheet_data = {
-        "openings": [
-            {"project": "MAZE", "title": "Dev PM", "targetTo": 1, "reason": "대체 채용", "status": "완료"},
-            {"project": "ZERO", "title": "Client Engineer", "targetTo": 1, "reason": "증원", "status": "진행중"},
-        ],
-        "candidates": [],
-    }
-    dashboard, _ = build_dashboard(sheet_data)
-    assert [item["status"] for item in dashboard["openings"]] == ["마감", "진행중"]
-
-
 def test_new_badge_only_marks_openings_added_since_previous_sync():
     existing_id = opening_id("MAZE", "Dev PM")
     sheet_data = {
@@ -146,3 +134,20 @@ def test_shared_to_conflicts_are_not_silently_summed_and_projects_stay_separate(
     data["openings"][1]["project"] = "MAZE"
     dashboard, _ = build_dashboard(data)
     assert len(dashboard["openings"]) == 2
+
+
+def test_dashboard_exports_g_column_status_and_normalizes_online_assignment():
+    data = {
+        "openings": [
+            {"project": "MAZE", "title": "Client Engineer", "targetTo": 2, "status": "완료"},
+            {"project": "MAZE", "title": "UI Artist", "targetTo": 1, "status": "진행중"},
+        ],
+        "candidates": [
+            {"id": "row-1", "name": "지원자", "stage": "온라인과제", "project": "MAZE", "openingTitle": "Client Engineer"},
+        ],
+    }
+    dashboard, _ = build_dashboard(data)
+    by_title = {opening["title"]: opening for opening in dashboard["openings"]}
+    assert by_title["Client Engineer"]["status"] == "완료"
+    assert by_title["Client Engineer"]["candidates"][0]["stage"] == "온라인 과제"
+    assert by_title["UI Artist"]["status"] == "진행중"

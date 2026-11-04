@@ -16,6 +16,21 @@ def normalized(value: object) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+def opening_status(value: object) -> str:
+    value = normalized(value).replace(' ', '')
+    return '완료' if value in {'완료', '종료', '완료됨', 'closed', 'done'} else '진행중'
+
+
+def pipeline_stage(value: object) -> str | None:
+    key = normalized(value).replace(' ', '')
+    aliases = {
+        '온라인과제': '온라인 과제', '과제전형': '온라인 과제', 'onlineassignment': '온라인 과제', 'onlineassessment': '온라인 과제',
+        '코딩테스트': '코딩테스트', '코딩과제': '코딩테스트', '역량검사': '역량검사', '면접': '면접',
+        '1차면접': '1차 면접', '2차면접': '2차 면접', '면접합격': '면접합격', '처우단계': '처우단계', '처우협의': '처우단계', 'offer': 'Offer', 'hired': 'Hired',
+    }
+    return aliases.get(key)
+
+
 def approval_link(value: object) -> str:
     url = value.strip() if isinstance(value, str) else ""
     if not re.match(r"^https?://", url, re.I) or re.search(r"[\s\\<>\"']", url):
@@ -25,11 +40,6 @@ def approval_link(value: object) -> str:
         return url if parsed.scheme.lower() in {"https", "http"} and parsed.hostname else ""
     except ValueError:
         return ""
-
-
-def completed_status(value: object) -> str:
-    status = normalized(value).replace(" ", "")
-    return "마감" if status in {"완료", "종료", "마감", "채용완료"} else "진행중"
 
 
 def opening_key(project: object, title: object) -> str:
@@ -64,9 +74,12 @@ def validate_shared_to(openings: list[dict]) -> None:
 def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = None) -> tuple[dict, int]:
     candidates_by_opening: dict[str, list[dict]] = defaultdict(list)
     for candidate in sheet_data.get("candidates", []):
+        stage = pipeline_stage(candidate.get("stage"))
+        if not stage or stage == 'Hired':
+            continue
         key = opening_key(candidate.get("project"), candidate.get("openingTitle"))
         if key.strip("\x1f"):
-            candidates_by_opening[key].append(candidate)
+            candidates_by_opening[key].append({**candidate, "stage": stage})
 
     hired_counts = sheet_data.get("hiredCounts") if isinstance(sheet_data.get("hiredCounts"), dict) else {}
     openings = []
@@ -93,7 +106,7 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
             "deadline": "",
             "source": "sheet",
             "isNew": previous_opening_ids is not None and item_id not in previous_opening_ids,
-            "status": completed_status(source.get("status")),
+            "status": opening_status(source.get("status")),
             "project": project,
             "targetTo": max(0, int(float(source.get("targetTo") or 0))),
             "toGroup": " ".join(str(source.get("toGroup") or "").split()),

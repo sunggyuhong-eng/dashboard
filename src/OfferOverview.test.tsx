@@ -69,7 +69,7 @@ describe('오퍼 · 입사 예정', () => {
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
     expect(html).toContain('id="pipeline-tab-offer" aria-selected="true"')
     expect(html).toContain('오퍼 지원자 <span>1명</span>')
-    expect(html).toContain('org-project-card')
+    expect(html).toContain('org-project-row')
     expect(html).not.toContain('shared-to-summary')
     expect(html).not.toContain('공유 TO')
     expect(html).toContain('입사 예정일')

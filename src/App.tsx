@@ -301,7 +301,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const started = hiringStartDate(opening)
         const finished = completionDate(opening)
         return <li key={opening.id}>
-          <div className="org-to-opening-title"><b>{roleName(opening, selectedProject || opening.project)}</b><small>{opening.title}</small><p className="org-to-reason"><strong>채용 사유</strong>{opening.reason || '채용 사유 미입력'}</p></div>
+          <div className="org-to-opening-title"><b>{roleName(opening, selectedProject || opening.project)}</b><p className="org-to-reason"><strong>채용 사유</strong>{opening.reason || '채용 사유 미입력'}</p></div>
           <div className="org-to-dates"><span>이력 추적 시작일 <b>{formatHistoryDate(started)}</b></span>{isCompleted && <span>완료 확인일 <b>{formatHistoryDate(finished)}</b></span>}</div>
           {!isCompleted && <div className="org-stage-breakdown">{stages.length ? PIPELINE_STAGES.flatMap(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return count ? [<span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span>] : [] }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>}
           <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>공고 상세 보기 <ChevronRight size={14} /></button>

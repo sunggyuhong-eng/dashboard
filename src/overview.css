@@ -274,3 +274,43 @@
 @media (max-width: 1400px) { .org-project-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 1050px) { .org-project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .org-project-grid { grid-template-columns: 1fr; } .content { padding: 22px 16px; } .workspace { grid-template-columns: 220px minmax(0, 1fr); } .recruiting-operations { padding: 18px 14px; } }
+
+/* Final TO detail styling: one title, strong contrast and larger stage chips. */
+.org-project-detail,
+.org-project-detail * { color: #111820; }
+.org-project-detail { padding: 28px 30px 32px; }
+.org-project-detail>header h3 { font-size: 28px; }
+.org-date-note { color: #111820; font-size: 14px; line-height: 1.7; }
+.org-to-section>header h4 { color: #111820; font-size: 21px; }
+.org-to-section>header small { color: #111820; font-size: 14px; }
+.org-to-group { padding: 22px 24px; }
+.org-to-metrics { color: #111820; font-size: 15px; }
+.org-to-metrics .org-status { color: #111820; font-size: 13px; }
+.org-to-metrics b { color: #111820; font-size: 16px; }
+.org-to-openings>li { grid-template-columns: minmax(320px, 1.2fr) minmax(260px, .8fr) minmax(340px, 1.5fr) auto; gap: 22px; padding: 20px 0; }
+.org-to-opening-title>b { color: #111820; font-size: 19px; line-height: 1.5; }
+.org-to-reason { color: #111820; font-size: 16px; line-height: 1.7; }
+.org-to-reason strong { color: #111820; font-size: 14px; }
+.org-to-dates { color: #111820; font-size: 14px; line-height: 1.6; }
+.org-to-dates b { color: #111820; font-size: 15px; }
+.org-to-openings .org-stage-breakdown { gap: 10px; }
+.org-to-openings .org-stage-chip { min-height: 46px; gap: 9px; padding: 9px 14px; color: #111820; font-size: 14px; }
+.org-to-openings .org-stage-chip span,
+.org-to-openings .org-stage-chip>b { color: #111820; font-size: 14px; }
+.org-to-openings .org-stage-chip>i { width: 9px; height: 9px; }
+.org-to-openings .org-stage-none { color: #111820; font-size: 14px; }
+.org-to-openings .org-opening-link { color: #111820; font-size: 14px; }
+.org-history>header h4,
+.org-history>header>small,
+.org-history li,
+.org-history-empty { color: #111820; font-size: 14px; }
+@media (max-width: 1200px) {
+  .org-to-openings>li { grid-template-columns: minmax(240px, 1fr) minmax(220px, .9fr) minmax(260px, 1.2fr); }
+  .org-to-openings .org-opening-link { grid-column: 3; }
+}
+@media (max-width: 760px) {
+  .org-project-detail { padding: 18px; }
+  .org-to-openings>li { grid-template-columns: minmax(0,1fr); gap: 13px; }
+  .org-to-openings .org-opening-link { grid-column: 1; }
+  .org-to-openings .org-stage-chip { min-height: 42px; }
+}

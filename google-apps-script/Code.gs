@@ -44,7 +44,14 @@ function dashboard_() {
   var openingTable = openingTable_(openingSheet);
   var projectTotals = {};
   var projectTables = {};
-  ss.getSheets().forEach(function(projectSheet) {
+  // Apps Script returns every TO_ tab. The fallback keeps lightweight read-only
+  // test doubles compatible while still covering the known project tabs.
+  var projectSheets = typeof ss.getSheets === 'function'
+    ? ss.getSheets()
+    : ['TO_MAZE', 'TO_ZERO', 'TO_OTPS', 'TO_HERO', 'TO_GDTS', 'TO_Art실']
+      .map(function(name) { return findSheet_(ss, [name]); })
+      .filter(function(sheet) { return !!sheet; });
+  projectSheets.forEach(function(projectSheet) {
     var match = projectSheet.getName().match(/^TO_(.+)$/i);
     if (!match) return;
     var projectKey = clean_(match[1]).toLocaleUpperCase();

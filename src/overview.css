@@ -378,6 +378,7 @@
 .maze-to-table-scroll tbody td:nth-child(2) { width: 90px; font-weight: 700; white-space: nowrap; }
 .maze-member-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .maze-member, .maze-to-number { display: inline-flex; align-items: center; min-height: 27px; padding: 4px 8px; border-radius: 7px; background: #f3f5f7; color: #202936; font-size: 12px; line-height: 1.35; }
+.maze-member-leave { background: #414b58; color: #fff; }
 .maze-to-number { background: #edf4ff; color: #174ea6; font-weight: 750; white-space: nowrap; }
 .maze-member-empty { color: #7b8794; }
 @media (max-width: 760px) {

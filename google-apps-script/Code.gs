@@ -41,15 +41,14 @@ function dashboard_() {
   if (!interview) throw new Error('연동용 사본에서 Dashboard_지원자 시트를 찾지 못했습니다.');
   var openingSheet = findSheet_(ss, ['Dashboard_TO']);
   if (!openingSheet) throw new Error('연동용 사본에서 Dashboard_TO 시트를 찾지 못했습니다.');
+  var openingTable = openingTable_(openingSheet);
   var projectTotals = {};
   var projectTables = {};
   var mazeSheet = findSheet_(ss, ['TO_MAZE']);
   if (mazeSheet) {
-    projectTables.MAZE = mazeTable_(mazeSheet);
+    projectTables.MAZE = mazeTable_(mazeSheet, openingTable);
     projectTotals.MAZE = projectTables.MAZE.totalTo;
   }
-
-  var openingTable = openingTable_(openingSheet);
   var openings = [];
   for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
     var openingRow = openingTable.values[o];
@@ -114,18 +113,37 @@ function dashboard_() {
   };
 }
 
-function mazeTable_(sheet) {
+function mazeTable_(sheet, openingTable) {
   var values = sheet.getDataRange().getDisplayValues();
+  var statusByTo = {};
+  var toColumn = openingTable.columns.toNumber;
+  var statusColumn = openingTable.columns.status;
+  if (toColumn != null) {
+    for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
+      var toNumber = number_(openingTable.values[o][toColumn]);
+      if (toNumber) statusByTo[String(toNumber)] = statusColumn == null ? '진행 중' : clean_(openingTable.values[o][statusColumn]) || '진행 중';
+    }
+  }
   var rows = [];
   for (var r = 3; r < values.length; r++) {
     var part = clean_(values[r][0]);
     if (!part) continue;
-    var members = [];
+    var slots = [];
     for (var c = 3; c < values[r].length; c++) {
       var cell = clean_(values[r][c]);
-      if (cell) members.push(cell);
+      if (!cell) continue;
+      var lines = cell.split(/\r?\n/).map(function(line) { return clean_(line); }).filter(Boolean);
+      for (var l = 0; l < lines.length; l++) {
+        if (/^\d+$/.test(lines[l])) {
+          var person = lines[l + 1] && !/^\d+$/.test(lines[l + 1]) ? lines[++l] : '';
+          var id = String(number_(lines[l - (person ? 1 : 0)]));
+          slots.push({ toNumber: number_(id), person: person, status: statusByTo[id] || '미연결' });
+        } else {
+          slots.push({ person: lines[l] });
+        }
+      }
     }
-    rows.push({ part: part, count: number_(values[r][2]), members: members });
+    rows.push({ part: part, count: number_(values[r][2]), slots: slots });
   }
   return { totalTo: number_(sheet.getRange('B1').getDisplayValue()), rows: rows };
 }

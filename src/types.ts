@@ -36,10 +36,16 @@ export type Opening = {
   candidates: Candidate[]
 }
 
+export type ProjectTableSlot = {
+  toNumber?: number
+  person?: string
+  status?: string
+}
+
 export type ProjectTableRow = {
   part: string
   count: number
-  members: string[]
+  slots: ProjectTableSlot[]
 }
 
 export type ProjectTable = {

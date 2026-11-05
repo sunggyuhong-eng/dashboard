@@ -11,7 +11,7 @@ type SheetPayload = {
   candidates?: SheetCandidate[]
   hiredCounts?: Record<string, unknown>
   projectTotals?: Record<string, unknown>
-  projectTables?: Record<string, { totalTo?: unknown; rows?: Array<{ part?: unknown; count?: unknown; members?: unknown[] }> }>
+  projectTables?: Record<string, { totalTo?: unknown; rows?: Array<{ part?: unknown; count?: unknown; slots?: Array<{toNumber?: unknown; person?: unknown; status?: unknown}> }> }>
   syncedAt?: string
 }
 
@@ -122,7 +122,11 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
         rows: (table.rows || []).map(row => ({
           part: clean(row.part),
           count: Math.max(0, Number(row.count) || 0),
-          members: Array.isArray(row.members) ? row.members.map(clean).filter(Boolean) : [],
+          slots: Array.isArray(row.slots) ? row.slots.map(slot => ({
+            toNumber: Math.max(0, Number(slot.toNumber) || 0) || undefined,
+            person: clean(slot.person) || undefined,
+            status: clean(slot.status) || undefined,
+          })) : [],
         })).filter(row => row.part),
       },
     ])),

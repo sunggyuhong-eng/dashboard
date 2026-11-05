@@ -6,7 +6,6 @@ import { PipelineOverview } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage } from './types'
-import { readOpeningHistory, recordOpeningHistory, projectHistory, type OpeningHistoryEvent } from './opening-history'
 
 type OpeningNote = {
   memo: string
@@ -261,11 +260,8 @@ function stageLabel(stage: PipelineStage) { return stageDisplayLabels[stage] }
 export function OverviewReport({ data, onSelectOpening }: { data: DashboardData; onSelectOpening?: (id: string) => void }) {
   const [reportOpen, setReportOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [historyEvents, setHistoryEvents] = useState<OpeningHistoryEvent[]>(() => readOpeningHistory())
-  useEffect(() => { setHistoryEvents(recordOpeningHistory(data.openings)) }, [data.openings])
 
   const active = data.openings.filter(opening => opening.status === '진행중')
-  const completed = data.openings.filter(opening => opening.status === '완료')
   const candidates = active.flatMap(opening => opening.candidates)
   const targetTo = totalTargetTo(active)
   const plannedHireCount = active.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Offer').length, 0)
@@ -279,44 +275,39 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
     return (ai < 0 ? projectOrder.length : ai) - (bi < 0 ? projectOrder.length : bi) || a.localeCompare(b, 'ko')
   })
   const selectedProjectOpenings = selectedProject ? allProjects.get(selectedProject) || [] : []
-  const selectedProjectEvents = selectedProject ? projectHistory(historyEvents, selectedProject) : []
-  const currentToGroups = groupOpeningsByTo(selectedProjectOpenings.filter(opening => opening.status === '진행중'))
-  const completedToGroups = groupOpeningsByTo(selectedProjectOpenings.filter(opening => opening.status === '완료'))
+  const selectedActiveOpenings = selectedProjectOpenings.filter(opening => opening.status === '진행중')
+  const currentToGroups = groupOpeningsByTo(selectedActiveOpenings)
   const openReport = () => setReportOpen(true)
 
-  const historyFor = (opening: Opening) => selectedProjectEvents.filter(event => event.openingId === opening.id)
-  const hiringStartDate = (opening: Opening) => historyFor(opening).find(event => event.kind === 'baseline')?.at
-  const completionDate = (opening: Opening) => historyFor(opening).find(event => event.kind === 'status' && event.status === '완료')?.at
-  const formatHistoryDate = (value?: string) => {
-    if (!value) return '기록 없음'
-    const date = new Date(value)
-    return Number.isNaN(date.getTime()) ? value.slice(0, 10) : new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
-  }
-
-  const renderToGroup = (group: ReturnType<typeof groupOpeningsByTo>[number], isCompleted: boolean) => {
-    const stages = PIPELINE_STAGES.map(stage => ({ stage, count: group.openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === stage).length, 0) })).filter(item => item.count)
-    const dateRows = [...new Map(group.openings.map(opening => {
-      const start = formatHistoryDate(hiringStartDate(opening))
-      const finish = isCompleted ? formatHistoryDate(completionDate(opening)) : ''
-      return [`${start}|${finish}`, { opening, start, finish }] as const
-    })).values()]
-    return <article className={`org-to-group ${isCompleted ? 'completed' : ''}`} key={`${isCompleted ? 'done' : 'active'}-${group.key}`}>
-      <header className="org-to-metrics"><div className="org-to-metrics-main"><span className={`org-status ${isCompleted ? 'done' : ''}`}>{isCompleted ? '완료' : '진행 중'}</span><span>목표 TO <b>{group.targetTo}명</b></span></div><div className="org-to-date-list">{dateRows.map(({ opening, start, finish }) => <span key={`${opening.id}-${start}-${finish}`}>{dateRows.length > 1 && <small>{roleName(opening, selectedProject || opening.project)} · </small>}이력 추적 시작일 <b>{start}</b>{isCompleted && <> · 완료 확인일 <b>{finish}</b></>}</span>)}</div></header>
+  const renderToGroup = (group: ReturnType<typeof groupOpeningsByTo>[number]) => {
+    return <article className="org-to-group" key={`active-${group.key}`}>
+      <header className="org-to-metrics"><div className="org-to-metrics-main"><span className="org-status">진행 중</span><span>목표 TO <b>{group.targetTo}명</b></span></div></header>
       <ul className="org-to-openings">{group.openings.map(opening => {
+        const stages = PIPELINE_STAGES.filter(stage => opening.candidates.some(candidate => candidate.stage === stage))
         const offerCandidates = opening.candidates.filter(candidate => candidate.stage === 'Offer')
         return <li key={opening.id}>
-          <div className="org-to-opening-title"><div className="org-to-opening-name">{opening.toNumber != null && <span className="org-to-number">TO {opening.toNumber}</span>}<b>{roleName(opening, selectedProject || opening.project)}</b></div><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong><ApprovalLink url={opening.approvalUrl} title={opening.title} /></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
-          {!isCompleted && <div className="org-to-opening-progress"><div className="org-stage-breakdown">{stages.length ? PIPELINE_STAGES.flatMap(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return count ? [<span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span>] : [] }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>{offerCandidates.length > 0 && <div className="org-to-hire-dates" aria-label="입사 예정"><strong>입사 예정</strong>{offerCandidates.map(candidate => <span key={candidate.id}><b>{candidate.name}</b><time>{candidate.hireDate ? formatKoreanDate(candidate.hireDate) : '예정일 미입력'}</time></span>)}</div>}</div>}
-          <button type="button" className="org-opening-link" onClick={() => onSelectOpening?.(opening.id)}>공고 상세 보기 <ChevronRight size={14} /></button>
+          <div className="org-to-opening-title"><div className="org-to-opening-name"><b>{roleName(opening, selectedProject || opening.project)}</b></div><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
+          <div className="org-to-opening-progress"><div className="org-stage-breakdown">{stages.length ? stages.map(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return <span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span> }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>{offerCandidates.length > 0 && <div className="org-to-hire-dates" aria-label="입사 예정"><strong>입사 예정</strong>{offerCandidates.map(candidate => <span key={candidate.id}><b>{candidate.name}</b><time>{candidate.hireDate ? formatKoreanDate(candidate.hireDate) : '예정일 미입력'}</time></span>)}</div>}</div>
+          {opening.approvalUrl && <a className="org-opening-link" href={opening.approvalUrl} target="_blank" rel="noreferrer">공고 상세 보기 <ChevronRight size={14} /></a>}
         </li>
       })}</ul>
     </article>
   }
 
-  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>현재 채용 진행 리포트</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
+  const mazeCategories = (table: NonNullable<DashboardData['projectTables']>[string]) => {
+    const assigned = new Set<number>()
+    return table.rows.map((row, rowIndex) => {
+      const ids = [...new Set(row.slots.flatMap(slot => slot.toNumber ? [slot.toNumber] : []))]
+      ids.forEach(id => assigned.add(id))
+      const openings = selectedActiveOpenings.filter(opening => opening.toNumber != null && ids.includes(opening.toNumber))
+      return openings.length ? <section className="maze-category" key={`${row.part}-${rowIndex}`}><header className="maze-category-heading"><h5>{row.part}</h5></header>{groupOpeningsByTo(openings).map(renderToGroup)}</section> : null
+    }).concat(selectedActiveOpenings.filter(opening => opening.toNumber == null || !assigned.has(opening.toNumber)).length ? [<section className="maze-category" key="maze-unassigned"><header className="maze-category-heading"><h5>파트 미지정</h5></header>{groupOpeningsByTo(selectedActiveOpenings.filter(opening => opening.toNumber == null || !assigned.has(opening.toNumber))).map(renderToGroup)}</section>] : [])
+  }
+
+  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>채용현황 (BETA Test 중)</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="오픈 공고" value={`${active.length}개`} /><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /></div>
     <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={active} onSelectOpening={onSelectOpening} /></section>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 해당 행 바로 아래에서 진행 중 TO와 완료된 TO를 확인할 수 있어요.</p></div></header>
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 해당 프로젝트의 전체 TO와 진행 중인 채용을 확인할 수 있어요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
         const projectTarget = totalTargetTo(projectOpenings)
@@ -334,19 +325,8 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
             <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
           </button>
           {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
-            {projectTable && <section className="maze-to-overview"><header><div><span>MAZE HEADCOUNT</span><h4>TO 현황</h4></div><div className="maze-to-metrics"><span><small>전체 TO</small><b>{projectTable.totalTo}명</b></span><span><small>채용 중 TO</small><b>{activeProjectTarget}명</b></span></div></header><h5>TO_MAZE 파트별 현황</h5><div className="maze-to-table-scroll"><table aria-label="MAZE TO 현황"><thead><tr><th scope="col">파트</th><th scope="col">인원</th><th scope="col">구성원 · 연결 TO</th></tr></thead><tbody>{projectTable.rows.map((row, rowIndex) => <tr key={`${row.part}-${rowIndex}`}><th scope="row">{row.part}</th><td>{row.count}명</td><td>{row.members.length ? <div className="maze-member-list">{row.members.flatMap((cell, cellIndex) => cell.split(/\r?\n/).map((member, lineIndex) => { const value = member.trim(); if (!value) return null; return /^\d+$/.test(value) ? <span className="maze-to-number" key={`${cellIndex}-${lineIndex}`}>TO {value}</span> : <span className="maze-member" key={`${cellIndex}-${lineIndex}`}>{value}</span> }))}</div> : <span className="maze-member-empty">—</span>}</td></tr>)}</tbody></table></div></section>}
-            <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>{currentToGroups.length}건</small></div></header>{currentToGroups.length ? currentToGroups.map(group => renderToGroup(group, false)) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
-            <section className="org-to-section"><header><div><h4>완료된 TO</h4><small>{completedToGroups.length}건</small></div></header>{completedToGroups.length ? completedToGroups.map(group => renderToGroup(group, true)) : <p className="org-history-empty">완료된 TO가 없습니다.</p>}</section>
-            <section className="org-history"><header><div><span>TO & PIPELINE HISTORY</span><h4>최근 1년 변경 이력</h4></div><small>이 브라우저에서 확인한 변경사항</small></header>
-              {selectedProjectEvents.length ? <ol>{selectedProjectEvents.slice().reverse().map((event, index) => {
-                const previous = event.previousSnapshot || selectedProjectEvents.filter(item => item.openingId === event.openingId && item.at < event.at).at(-1)?.snapshot
-                const targetChanged = !!previous && previous.targetTo !== event.snapshot.targetTo
-                const targetDelta = targetChanged ? event.snapshot.targetTo - previous!.targetTo : 0
-                const targetChangeText = targetChanged ? `목표 TO ${previous!.targetTo}명 → ${event.snapshot.targetTo}명 (${targetDelta > 0 ? '+' : ''}${targetDelta}명)` : `목표 TO ${event.snapshot.targetTo || '미입력'}명`
-                const eventLabel = event.kind === 'baseline' ? '기록 시작' : targetChanged ? `목표 TO 변경${event.kind === 'status' ? ` · 상태 변경 ${event.previousStatus} → ${event.status}` : ''}` : event.kind === 'status' ? `상태 변경 · ${event.previousStatus} → ${event.status}` : 'TO / 전형 현황 변경'
-                return <li key={`${event.openingId}-${event.at}-${index}`}><time>{new Date(event.at).toLocaleString('ko-KR')}</time><b>{eventLabel}</b><span>{roleName({ title: event.title } as Opening, selectedProject)} · {targetChangeText} · {Object.entries(event.snapshot.stageCounts).map(([stage, count]) => `${stageLabel(stage as PipelineStage)} ${count}명`).join(' · ') || '진행 지원자 없음'}</span></li>
-              })}</ol> : <p className="org-history-empty">이 프로젝트의 기록이 아직 없습니다.</p>}
-            </section>
+            {projectTable && <section className="maze-to-overview"><header><div><span>MAZE HEADCOUNT</span><h4>TO 현황</h4></div><div className="maze-to-metrics"><span><small>전체 TO</small><b>{projectTable.totalTo}명</b></span><span><small>채용 중 TO</small><b>{activeProjectTarget}명</b></span></div></header><h5>TO_MAZE 파트별 현황</h5><div className="maze-to-table-scroll"><table aria-label="MAZE TO 현황"><thead><tr><th scope="col">파트</th><th scope="col">인원</th><th scope="col">구성원 · TO 상태</th></tr></thead><tbody>{projectTable.rows.map((row, rowIndex) => <tr key={`${row.part}-${rowIndex}`}><th scope="row">{row.part}</th><td>{row.count}명</td><td>{row.slots.length ? <div className="maze-member-list">{row.slots.map((slot, slotIndex) => slot.person?.includes('입사예정') ? <span className="maze-planned-hire" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('퇴사예정') ? <span className="maze-planned-departure" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.toNumber ? <span className={`maze-to-status ${slot.status === '완료' ? 'done' : ''}`} key={`${slot.toNumber}-${slotIndex}`}>{slot.status === '완료' ? '완료' : '채용 중'}</span> : slot.person ? <span className="maze-member" key={slotIndex}>{slot.person}</span> : null)}</div> : <span className="maze-member-empty">—</span>}</td></tr>)}</tbody></table></div></section>}
+            <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>(채용 중 TO {activeProjectTarget}명)</small></div></header>{projectTable ? mazeCategories(projectTable) : currentToGroups.length ? currentToGroups.map(renderToGroup) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
           </section>}
         </div>
       })}</div>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="New Project">
+  <rect x="1" y="1" width="126" height="126" rx="22" fill="#fff" stroke="#d8dde3" stroke-width="2"/>
+  <text x="64" y="59" text-anchor="middle" fill="#111820" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" letter-spacing="1.2">NEW</text>
+  <text x="64" y="83" text-anchor="middle" fill="#111820" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="1.35">PROJECT</text>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Server Wi-Fi">
+  <rect width="128" height="128" rx="24" fill="#f3f5f7"/>
+  <circle cx="64" cy="64" r="49" fill="#fff" stroke="#e0e4e8" stroke-width="2"/>
+  <g transform="translate(30 30) scale(2.85)" fill="none" stroke="#17212d" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9">
+    <path d="M5 13a10 10 0 0 1 14 0"/>
+    <path d="M8.5 16.5a5 5 0 0 1 7 0"/>
+    <path d="M2 9a15 15 0 0 1 20 0"/>
+    <path d="M12 20h.01"/>
+  </g>
+</svg>

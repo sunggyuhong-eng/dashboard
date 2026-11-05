@@ -17,6 +17,19 @@ type SheetPayload = {
 const clean = (value: unknown) => String(value ?? '').trim()
 const normalized = (value: unknown) => clean(value).replace(/\s+/g, ' ').toLowerCase()
 const openingKey = (project: unknown, title: unknown) => `${normalized(project)}\u001f${normalized(title)}`
+
+export function normalizePipelineStage(value: unknown): PipelineStage | null {
+  const key = normalized(value).replace(/[\s_-]+/g, '')
+  const aliases: Record<string, PipelineStage> = {
+    '온라인과제': '온라인 과제', '온라인과제전형': '온라인 과제',
+    '코딩테스트': '코딩테스트', '역량검사': '역량검사',
+    '면접': '면접', '1차면접': '1차 면접', '2차면접': '2차 면접',
+    '면접합격': '면접합격', '처우단계': '처우단계', '처우협의': '처우단계',
+    'offer': 'Offer', '오퍼': 'Offer',
+  }
+  return aliases[key] || null
+}
+
 async function openingId(project: unknown, title: unknown) {
   const input = new TextEncoder().encode(openingKey(project, title))
   const digest = await crypto.subtle.digest('SHA-256', input)
@@ -53,14 +66,14 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
   const previousIds = new Set((previous?.openings || []).map(item => item.id))
   const candidatesByOpening = new Map<string, Candidate[]>()
   payload.candidates.forEach((source, index) => {
-    const stage = clean(source.stage)
-    if (!PIPELINE_STAGES.includes(stage as PipelineStage)) return
+    const stage = normalizePipelineStage(source.stage)
+    if (!stage) return
     const key = openingKey(source.project, source.openingTitle)
     const candidate: Candidate = {
       id: clean(source.id) || `row-${clean(source.row) || index + 1}`,
       row: Number(source.row) || index + 1,
       name: clean(source.name),
-      stage: stage as PipelineStage,
+      stage,
       project: clean(source.project),
       openingTitle: clean(source.openingTitle),
       hireDate: clean(source.hireDate),

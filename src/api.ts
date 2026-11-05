@@ -20,6 +20,8 @@ const openingKey = (project: unknown, title: unknown) => `${normalized(project)}
 
 export function normalizePipelineStage(value: unknown): PipelineStage | null {
   const key = normalized(value).replace(/[\s_-]+/g, '')
+  if (key.includes('코딩') || key.includes('coding')) return '코딩테스트'
+  if (key.includes('과제') || key.includes('assignment') || key === 'task' || key.includes('onlinetask')) return '온라인 과제'
   const aliases: Record<string, PipelineStage> = {
     '온라인과제': '온라인 과제', '온라인과제전형': '온라인 과제',
     '코딩테스트': '코딩테스트', '역량검사': '역량검사',

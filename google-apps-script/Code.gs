@@ -46,7 +46,10 @@ function dashboard_() {
   var projectTables = {};
   [
     { key: 'MAZE', sheet: findSheet_(ss, ['TO_MAZE']) },
-    { key: 'ZERO', sheet: findSheet_(ss, ['TO_ZERO']) }
+    { key: 'ZERO', sheet: findSheet_(ss, ['TO_ZERO']) },
+    { key: 'OTPS', sheet: findSheet_(ss, ['TO_OTPS']) },
+    { key: 'HERO', sheet: findSheet_(ss, ['TO_HERO']) },
+    { key: 'GDTS', sheet: findSheet_(ss, ['TO_GDTS']) }
   ].forEach(function(item) {
     if (!item.sheet) return;
     projectTables[item.key] = mazeTable_(item.sheet, openingTable);

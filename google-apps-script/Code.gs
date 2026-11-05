@@ -44,11 +44,14 @@ function dashboard_() {
   var openingTable = openingTable_(openingSheet);
   var projectTotals = {};
   var projectTables = {};
-  var mazeSheet = findSheet_(ss, ['TO_MAZE']);
-  if (mazeSheet) {
-    projectTables.MAZE = mazeTable_(mazeSheet, openingTable);
-    projectTotals.MAZE = projectTables.MAZE.totalTo;
-  }
+  [
+    { key: 'MAZE', sheet: findSheet_(ss, ['TO_MAZE']) },
+    { key: 'ZERO', sheet: findSheet_(ss, ['TO_ZERO']) }
+  ].forEach(function(item) {
+    if (!item.sheet) return;
+    projectTables[item.key] = mazeTable_(item.sheet, openingTable);
+    projectTotals[item.key] = projectTables[item.key].totalTo;
+  });
   var openings = [];
   for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
     var openingRow = openingTable.values[o];

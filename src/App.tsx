@@ -54,7 +54,7 @@ function roleName(opening: Opening, project: string) {
     .trim() || opening.title
 }
 
-function displayMazeSlots(slots: ProjectTableSlot[]) {
+function displayProjectSlots(slots: ProjectTableSlot[]) {
   const merged: ProjectTableSlot[] = []
   for (let index = 0; index < slots.length; index++) {
     const slot = slots[index]
@@ -309,7 +309,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
     </article>
   }
 
-  const mazeCategories = (table: NonNullable<DashboardData['projectTables']>[string]) => {
+  const projectCategories = (table: NonNullable<DashboardData['projectTables']>[string]) => {
     const assigned = new Set<number>()
     return table.rows.map((row, rowIndex) => {
       const ids = [...new Set(row.slots.flatMap(slot => slot.toNumber ? [slot.toNumber] : []))]
@@ -335,13 +335,13 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const icon = iconFiles[projectKey]
         return <div className="org-project-entry" key={project}>
           <button type="button" className={`org-project-row ${projectTotal != null ? 'has-project-total' : ''} ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
-            <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong>{projectTotal != null && <span className="org-project-headcount"><span>전체 TO <b>{projectTotal}명</b></span><span>채용 중 TO <b>{activeProjectTarget}명</b></span></span>}</span></span>
+              <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong>{projectTotal != null && <span className="org-project-headcount"><span>전체 TO <b>{projectTotal}명</b></span><span>채용중 TO <b>{activeProjectTarget}명</b></span></span>}</span></span>
             {projectTotal == null && <span className="org-project-stat"><small>목표 TO</small><b>{projectTarget}명</b></span>}
             <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
           </button>
           {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
-            {projectTable && <section className="maze-to-overview"><header><div><span>MAZE HEADCOUNT</span><h4>TO 현황</h4></div><div className="maze-to-metrics"><span><small>전체 TO</small><b>{projectTable.totalTo}명</b></span><span><small>채용 중 TO</small><b>{activeProjectTarget}명</b></span></div></header><h5>TO_MAZE 파트별 현황</h5><div className="maze-to-table-scroll"><table aria-label="MAZE TO 현황"><thead><tr><th scope="col">파트</th><th scope="col">인원</th><th scope="col">구성원 · TO 상태</th></tr></thead><tbody>{projectTable.rows.map((row, rowIndex) => { const displaySlots = displayMazeSlots(row.slots); return <tr key={`${row.part}-${rowIndex}`}><th scope="row">{row.part}</th><td>{row.count}명</td><td>{displaySlots.length ? <div className="maze-member-list">{displaySlots.map((slot, slotIndex) => slot.person?.includes('입사예정') ? <span className="maze-planned-hire" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('퇴사예정') ? <span className="maze-planned-departure" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.toNumber ? <span className={`maze-to-status ${slot.status === '완료' ? 'done' : ''}`} key={`${slot.toNumber}-${slotIndex}`}>{slot.status === '완료' ? '완료' : '채용 중'}</span> : slot.person ? <span className="maze-member" key={slotIndex}>{slot.person}</span> : null)}</div> : <span className="maze-member-empty">—</span>}</td></tr> })}</tbody></table></div></section>}
-            <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>(채용 중 TO {activeProjectTarget}명)</small></div></header>{projectTable ? mazeCategories(projectTable) : currentToGroups.length ? currentToGroups.map(renderToGroup) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
+            {projectTable && <section className="maze-to-overview"><header><div><span>TO_{projectKey} HEADCOUNT</span><h4>TO 현황</h4></div><div className="maze-to-metrics"><span><small>전체 TO</small><b>{projectTable.totalTo}명</b></span><span><small>채용중 TO</small><b>{activeProjectTarget}명</b></span></div></header><h5>TO_{projectKey} 파트별 현황</h5><div className="maze-to-table-scroll"><table aria-label={`${projectKey} TO 현황`}><thead><tr><th scope="col">파트</th><th scope="col">인원</th><th scope="col">구성원 · TO 상태</th></tr></thead><tbody>{projectTable.rows.map((row, rowIndex) => { const displaySlots = displayProjectSlots(row.slots); return <tr key={`${row.part}-${rowIndex}`}><th scope="row">{row.part}</th><td>{row.count}명</td><td>{displaySlots.length ? <div className="maze-member-list">{displaySlots.map((slot, slotIndex) => slot.person?.includes('입사예정') ? <span className="maze-planned-hire" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('퇴사예정') ? <span className="maze-planned-departure" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.toNumber ? <span className={`maze-to-status ${slot.status === '완료' ? 'done' : ''}`} key={`${slot.toNumber}-${slotIndex}`}>{slot.status === '완료' ? '완료' : '채용중'}</span> : slot.person ? <span className="maze-member" key={slotIndex}>{slot.person}</span> : null)}</div> : <span className="maze-member-empty">—</span>}</td></tr> })}</tbody></table></div></section>}
+            <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>(채용중 TO {activeProjectTarget}명)</small></div></header>{projectTable ? projectCategories(projectTable) : currentToGroups.length ? currentToGroups.map(renderToGroup) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
           </section>}
         </div>
       })}</div>

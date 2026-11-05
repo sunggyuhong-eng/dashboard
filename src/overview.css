@@ -396,7 +396,7 @@
 .maze-category-heading h5 { margin: 0; color: #111820; font-size: 18px; }
 .maze-category .org-to-group { margin-top: 0; padding: 10px 0 0; }
 .maze-category .org-to-metrics { display: none; }
-.maze-to-status { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #f1f3f5; color: #111820; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.maze-to-status { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #edf4ff; color: #145fc7; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .maze-to-status.done { color: #66717d; background: #f1f3f5; }
 .maze-planned-hire { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #edf4ff; color: #145fc7; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .maze-planned-departure { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #fff0f0; color: #c62828; font-size: 13px; font-weight: 750; white-space: nowrap; }
@@ -406,6 +406,7 @@
 .org-to-reason-heading strong { color: #111820; }
 .org-to-reason>span:last-child { color: #111820; }
 .org-to-opening-name>b { color: #111820; }
+.org-opening-target-badge { display: inline-flex; align-items: center; flex: none; min-height: 27px; padding: 3px 9px; border: 1px solid #e1e6ec; border-radius: 8px; color: #111820; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .org-to-opening-progress .org-stage-chip { border: 1px solid #dfe4ea; background: #fff; }
 @media (max-width: 760px) {
   .maze-category { padding: 14px; }

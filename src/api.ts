@@ -1,4 +1,4 @@
-import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type PipelineStage } from './types'
+import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type PipelineStage, type ProjectTable } from './types'
 import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
@@ -11,6 +11,7 @@ type SheetPayload = {
   candidates?: SheetCandidate[]
   hiredCounts?: Record<string, unknown>
   projectTotals?: Record<string, unknown>
+  projectTables?: Record<string, { totalTo?: unknown; rows?: Array<{ part?: unknown; count?: unknown; members?: unknown[] }> }>
   syncedAt?: string
 }
 
@@ -113,6 +114,17 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
     projectTotals: Object.fromEntries(Object.entries(payload.projectTotals || {}).map(([project, total]) => [
       project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR'),
       Math.max(0, Number(total) || 0),
+    ])),
+    projectTables: Object.fromEntries(Object.entries(payload.projectTables || {}).map(([project, table]): [string, ProjectTable] => [
+      project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR'),
+      {
+        totalTo: Math.max(0, Number(table.totalTo) || 0),
+        rows: (table.rows || []).map(row => ({
+          part: clean(row.part),
+          count: Math.max(0, Number(row.count) || 0),
+          members: Array.isArray(row.members) ? row.members.map(clean).filter(Boolean) : [],
+        })).filter(row => row.part),
+      },
     ])),
   }
 }

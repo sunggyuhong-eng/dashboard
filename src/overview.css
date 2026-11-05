@@ -361,9 +361,31 @@
 .org-to-hire-dates>strong { margin-right: 2px; font-size: 13px; }
 .org-to-hire-dates>span { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid #e5e8eb; border-radius: 8px; background: #f8f9fa; }
 .org-to-hire-dates b, .org-to-hire-dates time { color: #111820; font-size: 13px; font-weight: 650; }
+.maze-to-overview { margin-top: 20px; padding: 22px 24px 18px; border-radius: 18px; background: #fff; }
+.maze-to-overview>header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.maze-to-overview>header>div:first-child>span { color: #697482; font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+.maze-to-overview h4 { margin: 4px 0 0; color: #111820; font-size: 22px; }
+.maze-to-metrics { display: flex; flex-wrap: wrap; gap: 10px; }
+.maze-to-metrics>span { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-radius: 11px; background: #f2f4f6; white-space: nowrap; }
+.maze-to-metrics small { color: #55616e; font-size: 13px; }
+.maze-to-metrics b { color: #111820; font-size: 20px; }
+.maze-to-overview h5 { margin: 22px 0 10px; color: #111820; font-size: 15px; }
+.maze-to-table-scroll { overflow-x: auto; border-top: 1px solid #e8ebef; }
+.maze-to-table-scroll table { width: 100%; min-width: 580px; border-collapse: collapse; text-align: left; }
+.maze-to-table-scroll th, .maze-to-table-scroll td { padding: 12px 10px; border-bottom: 1px solid #edf0f2; color: #111820; font-size: 14px; vertical-align: middle; }
+.maze-to-table-scroll thead th { color: #596574; font-size: 12px; font-weight: 700; }
+.maze-to-table-scroll tbody th { width: 180px; font-weight: 700; }
+.maze-to-table-scroll tbody td:nth-child(2) { width: 90px; font-weight: 700; white-space: nowrap; }
+.maze-member-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.maze-member, .maze-to-number { display: inline-flex; align-items: center; min-height: 27px; padding: 4px 8px; border-radius: 7px; background: #f3f5f7; color: #202936; font-size: 12px; line-height: 1.35; }
+.maze-to-number { background: #edf4ff; color: #174ea6; font-weight: 750; white-space: nowrap; }
+.maze-member-empty { color: #7b8794; }
 @media (max-width: 760px) {
   .org-to-metrics { align-items: flex-start; flex-direction: column; }
   .org-to-date-list { align-items: flex-start; margin-left: 0; text-align: left; }
   .org-to-date-list>span { white-space: normal; }
   .org-to-hire-dates { align-items: flex-start; flex-direction: column; }
+  .maze-to-overview { padding: 18px 14px 14px; }
+  .maze-to-metrics { width: 100%; }
+  .maze-to-metrics>span { flex: 1; justify-content: space-between; }
 }

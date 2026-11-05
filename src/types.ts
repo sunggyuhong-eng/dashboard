@@ -36,10 +36,22 @@ export type Opening = {
   candidates: Candidate[]
 }
 
+export type ProjectTableRow = {
+  part: string
+  count: number
+  members: string[]
+}
+
+export type ProjectTable = {
+  totalTo: number
+  rows: ProjectTableRow[]
+}
+
 export type DashboardData = {
   openings: Opening[]
   syncedAt: string
   candidateCount: number
   sheetApiUrl?: string
   projectTotals?: Record<string, number>
+  projectTables?: Record<string, ProjectTable>
 }

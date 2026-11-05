@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="KONG">
+  <rect width="128" height="128" rx="24" fill="#f1f3f5"/>
+  <circle cx="64" cy="47" r="21" fill="#7b8794"/>
+  <path d="M24 106c3-21 18-34 40-34s37 13 40 34c.4 2.5-1.6 4.5-4.2 4.5H28.2c-2.6 0-4.6-2-4.2-4.5Z" fill="#7b8794"/>
+  <path d="M52 74l12 12 12-12" fill="none" stroke="#f1f3f5" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+</svg>

@@ -42,8 +42,12 @@ function dashboard_() {
   var openingSheet = findSheet_(ss, ['Dashboard_TO']);
   if (!openingSheet) throw new Error('연동용 사본에서 Dashboard_TO 시트를 찾지 못했습니다.');
   var projectTotals = {};
+  var projectTables = {};
   var mazeSheet = findSheet_(ss, ['TO_MAZE']);
-  if (mazeSheet) projectTotals.MAZE = number_(mazeSheet.getRange('B1').getDisplayValue());
+  if (mazeSheet) {
+    projectTables.MAZE = mazeTable_(mazeSheet);
+    projectTotals.MAZE = projectTables.MAZE.totalTo;
+  }
 
   var openingTable = openingTable_(openingSheet);
   var openings = [];
@@ -105,8 +109,25 @@ function dashboard_() {
     candidates: candidates,
     hiredCounts: hiredCounts,
     projectTotals: projectTotals,
+    projectTables: projectTables,
     syncedAt: new Date().toISOString()
   };
+}
+
+function mazeTable_(sheet) {
+  var values = sheet.getDataRange().getDisplayValues();
+  var rows = [];
+  for (var r = 3; r < values.length; r++) {
+    var part = clean_(values[r][0]);
+    if (!part) continue;
+    var members = [];
+    for (var c = 3; c < values[r].length; c++) {
+      var cell = clean_(values[r][c]);
+      if (cell) members.push(cell);
+    }
+    rows.push({ part: part, count: number_(values[r][2]), members: members });
+  }
+  return { totalTo: number_(sheet.getRange('B1').getDisplayValue()), rows: rows };
 }
 
 function openingTable_(sheet) {

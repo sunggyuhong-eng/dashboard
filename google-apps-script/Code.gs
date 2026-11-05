@@ -44,16 +44,12 @@ function dashboard_() {
   var openingTable = openingTable_(openingSheet);
   var projectTotals = {};
   var projectTables = {};
-  [
-    { key: 'MAZE', sheet: findSheet_(ss, ['TO_MAZE']) },
-    { key: 'ZERO', sheet: findSheet_(ss, ['TO_ZERO']) },
-    { key: 'OTPS', sheet: findSheet_(ss, ['TO_OTPS']) },
-    { key: 'HERO', sheet: findSheet_(ss, ['TO_HERO']) },
-    { key: 'GDTS', sheet: findSheet_(ss, ['TO_GDTS']) }
-  ].forEach(function(item) {
-    if (!item.sheet) return;
-    projectTables[item.key] = mazeTable_(item.sheet, openingTable);
-    projectTotals[item.key] = projectTables[item.key].totalTo;
+  ss.getSheets().forEach(function(projectSheet) {
+    var match = projectSheet.getName().match(/^TO_(.+)$/i);
+    if (!match) return;
+    var projectKey = clean_(match[1]).toLocaleUpperCase();
+    projectTables[projectKey] = mazeTable_(projectSheet, openingTable);
+    projectTotals[projectKey] = projectTables[projectKey].totalTo;
   });
   var openings = [];
   for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
@@ -140,7 +136,15 @@ function mazeTable_(sheet, openingTable) {
       if (!cell) continue;
       var lines = cell.split(/\r?\n/).map(function(line) { return clean_(line); }).filter(Boolean);
       for (var l = 0; l < lines.length; l++) {
-        if (/^\d+$/.test(lines[l])) {
+        var plannedLink = lines[l].match(/^(.*?)\s*\((입사예정|퇴사예정|대체채용\s*진행중)\s*\/\s*(\d+)\)\s*$/);
+        if (plannedLink && clean_(plannedLink[1])) {
+          var linkedTo = String(number_(plannedLink[3]));
+          slots.push({
+            toNumber: number_(linkedTo),
+            person: clean_(plannedLink[1]) + '(' + plannedLink[2] + ')',
+            status: statusByTo[linkedTo] || '미연결'
+          });
+        } else if (/^\d+$/.test(lines[l])) {
           var person = lines[l + 1] && !/^\d+$/.test(lines[l + 1]) ? lines[++l] : '';
           var id = String(number_(lines[l - (person ? 1 : 0)]));
           slots.push({ toNumber: number_(id), person: person, status: statusByTo[id] || '미연결' });

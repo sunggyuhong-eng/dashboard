@@ -58,20 +58,37 @@ function dashboard_() {
     projectTables[projectKey] = mazeTable_(projectSheet, openingTable);
     projectTotals[projectKey] = projectTables[projectKey].totalTo;
   });
+  // A cell such as "4&5" in a TO_ sheet means those postings share one seat.
+  // Map both Dashboard_TO IDs to the same group so every dashboard total counts
+  // the combined seat once while retaining each posting's candidate details.
+  var sharedToGroups = {};
+  Object.keys(projectTables).forEach(function(projectKey) {
+    projectTables[projectKey].rows.forEach(function(row) {
+      row.slots.forEach(function(slot) {
+        if (!slot.toNumbers || slot.toNumbers.length < 2) return;
+        var groupName = '시트 공유 TO ' + slot.toNumbers.join('&');
+        slot.toNumbers.forEach(function(toNumber) {
+          sharedToGroups[projectToKey_(projectKey) + '\u001f' + toNumber] = groupName;
+        });
+      });
+    });
+  });
   var openings = [];
   for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
     var openingRow = openingTable.values[o];
     var openingProject = clean_(openingRow[openingTable.columns.project]);
     var openingTitle = dashboardOpeningTitle_(openingRow[openingTable.columns.title]);
     if (!openingProject || !openingTitle) continue;
+    var openingToNumber = openingTable.columns.toNumber == null ? '' : number_(openingRow[openingTable.columns.toNumber]);
+    var sharedToGroup = openingToNumber ? sharedToGroups[projectToKey_(openingProject) + '\u001f' + openingToNumber] : '';
     openings.push({
       row: o + 1,
       project: openingProject,
       title: openingTitle,
       targetTo: number_(openingRow[openingTable.columns.targetTo]),
       status: openingTable.columns.status == null ? '진행중' : clean_(openingRow[openingTable.columns.status]) || '진행중',
-      toNumber: openingTable.columns.toNumber == null ? '' : number_(openingRow[openingTable.columns.toNumber]),
-      toGroup: openingTable.columns.toGroup == null ? '' : clean_(openingRow[openingTable.columns.toGroup]).replace(/\s+/g, ' '),
+      toNumber: openingToNumber,
+      toGroup: sharedToGroup || (openingTable.columns.toGroup == null ? '' : clean_(openingRow[openingTable.columns.toGroup]).replace(/\s+/g, ' ')),
       reason: clean_(openingRow[openingTable.columns.reason]),
       approvalUrl: openingTable.approvalLinks[o] || ''
     });
@@ -150,6 +167,13 @@ function mazeTable_(sheet, openingTable) {
             toNumber: number_(linkedTo),
             person: clean_(plannedLink[1]) + '(' + plannedLink[2] + ')',
             status: statusByTo[linkedTo] || '미연결'
+          });
+        } else if (/^\d+(?:\s*&\s*\d+)+$/.test(lines[l])) {
+          var linkedNumbers = lines[l].split('&').map(function(value) { return number_(value); }).filter(function(value) { return value > 0; });
+          var linkedStatuses = linkedNumbers.map(function(id) { return statusByTo[String(id)] || '미연결'; });
+          slots.push({
+            toNumbers: linkedNumbers,
+            status: linkedStatuses.length && linkedStatuses.every(function(status) { return status === '완료'; }) ? '완료' : '진행 중'
           });
         } else if (/^\d+$/.test(lines[l])) {
           var person = lines[l + 1] && !/^\d+$/.test(lines[l + 1]) ? lines[++l] : '';
@@ -328,6 +352,13 @@ function number_(value) {
 
 function key_(project, title) {
   return clean_(project).replace(/\s+/g, ' ').toLowerCase() + '\u001f' + clean_(title).replace(/\s+/g, ' ').toLowerCase();
+}
+
+function projectToKey_(project) {
+  var value = clean_(project).replace(/^Project\s+/i, '').replace(/\s+/g, '').toLocaleUpperCase();
+  if (value === '아트실') return 'ART실';
+  if (value === 'OCTOPUS') return 'OTPS';
+  return value;
 }
 
 function output_(value) {

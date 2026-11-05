@@ -38,6 +38,7 @@ export type Opening = {
 
 export type ProjectTableSlot = {
   toNumber?: number
+  toNumbers?: number[]
   person?: string
   status?: string
 }

@@ -26,6 +26,7 @@ export type Opening = {
   deadline: string
   status: '진행중' | '완료' | '마감'
   targetTo: number
+  toNumber?: number
   toGroup?: string
   hiredCount: number
   reason: string
@@ -40,4 +41,5 @@ export type DashboardData = {
   syncedAt: string
   candidateCount: number
   sheetApiUrl?: string
+  projectTotals?: Record<string, number>
 }

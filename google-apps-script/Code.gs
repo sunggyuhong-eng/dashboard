@@ -41,6 +41,9 @@ function dashboard_() {
   if (!interview) throw new Error('연동용 사본에서 Dashboard_지원자 시트를 찾지 못했습니다.');
   var openingSheet = findSheet_(ss, ['Dashboard_TO']);
   if (!openingSheet) throw new Error('연동용 사본에서 Dashboard_TO 시트를 찾지 못했습니다.');
+  var projectTotals = {};
+  var mazeSheet = findSheet_(ss, ['TO_MAZE']);
+  if (mazeSheet) projectTotals.MAZE = number_(mazeSheet.getRange('B1').getDisplayValue());
 
   var openingTable = openingTable_(openingSheet);
   var openings = [];
@@ -54,8 +57,8 @@ function dashboard_() {
       project: openingProject,
       title: openingTitle,
       targetTo: number_(openingRow[openingTable.columns.targetTo]),
-      // 연동용 사본 Dashboard_TO의 G열 상태(사용자 드롭다운)를 읽기만 합니다.
-      status: normalizeOpeningStatus_(openingRow[6]),
+      status: openingTable.columns.status == null ? '진행중' : clean_(openingRow[openingTable.columns.status]) || '진행중',
+      toNumber: openingTable.columns.toNumber == null ? '' : number_(openingRow[openingTable.columns.toNumber]),
       toGroup: openingTable.columns.toGroup == null ? '' : clean_(openingRow[openingTable.columns.toGroup]).replace(/\s+/g, ' '),
       reason: clean_(openingRow[openingTable.columns.reason]),
       approvalUrl: openingTable.approvalLinks[o] || ''
@@ -74,14 +77,14 @@ function dashboard_() {
   for (var i = candidateTable.headerRow; i < candidateTable.values.length; i++) {
     var row = candidateTable.values[i];
     var rawRow = candidateTable.rawValues[i] || [];
-    var stage = normalizePipelineStage_(row[col['진행단계']]);
+    var stage = clean_(row[col['진행단계']]);
     var name = clean_(row[col['이름']]);
     var title = dashboardOpeningTitle_(row[col['직무(공고명)']]);
     var project = col['PJ'] == null ? '' : clean_(row[col['PJ']]);
     if (!title) continue;
     var openingKey = key_(project, title);
     if (stage === 'Hired') hiredCounts[openingKey] = (hiredCounts[openingKey] || 0) + 1;
-    if (name && stage && stage !== 'Hired') {
+    if (name && ACTIVE_STAGES.indexOf(stage) >= 0) {
       candidates.push({
         id: 'row-' + (i + 1),
         row: i + 1,
@@ -101,6 +104,7 @@ function dashboard_() {
     openings: openings,
     candidates: candidates,
     hiredCounts: hiredCounts,
+    projectTotals: projectTotals,
     syncedAt: new Date().toISOString()
   };
 }
@@ -111,6 +115,8 @@ function openingTable_(sheet) {
     project: ['프로젝트', '프로젝트명', '프로젝트 명', '프로젝트 이름', 'PJ'],
     title: ['공고명', '공고 이름', '직무(공고명)'],
     targetTo: ['채용인원', '채용 인원', 'TO', '목표 TO'],
+    status: ['채용버튼', '상태', '진행 상태', '진행여부'],
+    toNumber: ['TO번호', 'TO 번호', 'TO ID'],
     toGroup: ['TO 그룹', 'TO그룹', '공유 TO 그룹', '공유TO그룹'],
     reason: ['채용사유', '채용 사유', '채용배경', '채용 배경'],
     approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서']
@@ -140,19 +146,6 @@ function openingTable_(sheet) {
     }
   }
   throw new Error(sheet.getName() + ' 시트에서 프로젝트, 공고명, 채용인원, 채용사유 헤더를 찾지 못했습니다.');
-}
-
-
-function normalizePipelineStage_(value) {
-  var raw = clean_(value).replace(/\s+/g, '').toLowerCase();
-  var aliases = { '온라인과제':'온라인 과제', '과제전형':'온라인 과제', '코딩테스트':'코딩테스트', '역량검사':'역량검사', '면접':'면접', '1차면접':'1차 면접', '2차면접':'2차 면접', '면접합격':'면접합격', '처우단계':'처우단계', '처우협의':'처우단계', 'offer':'Offer', 'hired':'Hired' };
-  return aliases[raw] || '';
-}
-
-function normalizeOpeningStatus_(value) {
-  var text = clean_(value).replace(/\s+/g, '').toLowerCase();
-  if (text === '완료' || text === '종료' || text === '완료됨' || text === 'closed' || text === 'done') return '완료';
-  return '진행중';
 }
 
 function table_(sheet, required) {

@@ -149,11 +149,14 @@
 /* Readability and inline project details. */
 .org-project-list { gap: 8px; }
 .org-project-entry { display: flex; min-width: 0; flex-direction: column; }
-.org-project-row { grid-template-columns: minmax(200px, 1fr) minmax(100px, .36fr) minmax(300px, 1.9fr) 20px; gap: 22px; min-height: 88px; padding: 20px 24px; }
+.org-project-row { grid-template-columns: minmax(280px, 1fr) minmax(350px, 1.8fr) 20px; gap: 22px; min-height: 88px; padding: 20px 24px; }
 .org-project-row.active { border-radius: 18px 18px 10px 10px; }
 .org-project-name { flex-direction: row; align-items: center; gap: 13px; }
 .org-project-name>img { width: 40px; height: 40px; flex: none; border-radius: 10px; object-fit: cover; }
 .org-project-name>span { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.org-project-headcount { display: flex; flex-wrap: wrap; gap: 7px; }
+.org-project-headcount>span { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 8px; border-radius: 7px; background: #fff; color: #202936; font-size: 12px; white-space: nowrap; }
+.org-project-headcount b { color: #111820; font-size: 13px; }
 .org-project-name strong { font-size: 19px; }
 .org-project-name small { font-size: 13px; }
 .org-project-stat small { font-size: 13px; }
@@ -204,7 +207,7 @@
 .pipeline-schedule time { font-size: 14px; }
 .pipeline-schedule .pipeline-hire-date { color: #333d4b; font-weight: 700; }
 @media (max-width: 1200px) {
-  .org-project-row { grid-template-columns: minmax(180px,1fr) minmax(90px,.35fr) 20px; gap: 14px; }
+  .org-project-row { grid-template-columns: minmax(220px,1fr) 20px; gap: 14px; }
   .org-project-stages { grid-column: 1 / -1; grid-row: 2; }
   .org-project-row>svg { grid-column: 3; grid-row: 1; justify-self: end; }
   .org-to-openings>li { grid-template-columns: minmax(180px,1fr) minmax(220px,.9fr) minmax(220px,1.2fr); }
@@ -317,6 +320,9 @@
   .org-to-openings .org-stage-chip { min-height: 42px; }
 }
 .org-to-openings>li { grid-template-columns: minmax(0,1.25fr) minmax(340px,1fr) auto; align-items: start; gap: 24px; }
+.org-to-opening-name { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.org-to-number { display: inline-flex; flex: none; align-items: center; min-height: 27px; padding: 3px 9px; border-radius: 8px; background: #edf4ff; color: #174ea6; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.org-to-opening-name>b { min-width: 0; }
 .org-to-opening-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .org-to-opening-heading>b { flex: 1; }
 .org-to-opening-heading .org-to-dates { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
@@ -337,8 +343,14 @@
 .org-to-date-list>span { white-space: nowrap; }
 .org-to-date-list small { color: #111820; font-size: 12px; }
 .org-to-date-list b { margin-left: 4px; color: #111820; font-size: 15px; }
+.org-to-opening-progress { display: flex; min-width: 0; flex-direction: column; gap: 11px; }
+.org-to-hire-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; color: #111820; font-size: 13px; }
+.org-to-hire-dates>strong { margin-right: 2px; font-size: 13px; }
+.org-to-hire-dates>span { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid #e5e8eb; border-radius: 8px; background: #f8f9fa; }
+.org-to-hire-dates b, .org-to-hire-dates time { color: #111820; font-size: 13px; font-weight: 650; }
 @media (max-width: 760px) {
   .org-to-metrics { align-items: flex-start; flex-direction: column; }
   .org-to-date-list { align-items: flex-start; margin-left: 0; text-align: left; }
   .org-to-date-list>span { white-space: normal; }
+  .org-to-hire-dates { align-items: flex-start; flex-direction: column; }
 }

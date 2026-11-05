@@ -328,6 +328,9 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const activeProjectTarget = totalTargetTo(activeOpenings)
         const projectKey = project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
         const projectTotal = data.projectTotals?.[projectKey]
+        const activeOnlyHeadcountProjects = ['QA', 'SERVER', 'KONG']
+        const showActiveOnlyHeadcount = projectTotal == null && activeOnlyHeadcountProjects.includes(projectKey)
+        const showHeadcountChips = projectTotal != null || showActiveOnlyHeadcount
         const projectTable = data.projectTables?.[projectKey]
         const projectTableName: Record<string, string> = { MAZE: 'TO_MAZE', ZERO: 'TO_ZERO', OTPS: 'TO_OTPS', HERO: 'TO_HERO', GDTS: 'TO_GDTS', 'ART실': 'TO_Art실' }
         const projectSheetName = projectTableName[projectKey] || `TO_${projectKey}`
@@ -335,8 +338,9 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const iconFiles: Record<string, string> = { 'ART실': 'art-photoshop.svg', ART: 'art-photoshop.svg', GDTS: 'gdts.png', OTPS: 'new-project.svg', MAZE: 'new-project.svg', HERO: 'new-project.svg', ZERO: 'zero.png', QA: 'qa-tools.svg', SERVER: 'server-wifi.svg', KONG: 'kong-person.svg' }
         const icon = iconFiles[projectKey]
         return <div className="org-project-entry" key={project}>
-          <button type="button" className={`org-project-row has-project-total ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
-              <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong><span className="org-project-headcount">{projectTotal != null && <span>전체 TO <b>{projectTotal}명</b></span>}<span>채용중 TO <b>{activeProjectTarget}명</b></span></span></span></span>
+          <button type="button" className={`org-project-row ${showHeadcountChips ? 'has-project-total' : ''} ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
+              <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong>{showHeadcountChips && <span className="org-project-headcount">{projectTotal != null && <span>전체 TO <b>{projectTotal}명</b></span>}<span>채용중 TO <b>{activeProjectTarget}명</b></span></span>}</span></span>
+            {projectTotal == null && !showActiveOnlyHeadcount && <span className="org-project-stat"><small>목표 TO</small><b>{totalTargetTo(projectOpenings)}명</b></span>}
             <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
           </button>
           {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>

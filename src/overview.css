@@ -399,9 +399,9 @@
 .maze-category .org-to-metrics { display: none; }
 .maze-to-status { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #edf4ff; color: #145fc7; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .maze-to-status.done { color: #66717d; background: #f1f3f5; }
-.maze-planned-hire { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #edf4ff; color: #145fc7; font-size: 13px; font-weight: 750; white-space: nowrap; }
+.maze-planned-hire { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #e8f6ee; color: #168348; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .maze-planned-departure { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #fff0f0; color: #c62828; font-size: 13px; font-weight: 750; white-space: nowrap; }
-.maze-planned-replacement { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #fff0f0; color: #c62828; font-size: 13px; font-weight: 750; white-space: nowrap; }
+.maze-planned-replacement { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 8px; background: #edf4ff; color: #145fc7; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .org-to-openings .org-opening-link { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; color: #111820; text-decoration: none; }
 .org-to-openings .org-opening-link:hover { color: #1b64da; text-decoration: underline; }
 .org-to-reason-heading { min-height: auto; }

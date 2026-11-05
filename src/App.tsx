@@ -319,13 +319,12 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
     }).concat(selectedActiveOpenings.filter(opening => opening.toNumber == null || !assigned.has(opening.toNumber)).length ? [<section className="maze-category" key="maze-unassigned"><header className="maze-category-heading"><h5>파트 미지정</h5></header>{groupOpeningsByTo(selectedActiveOpenings.filter(opening => opening.toNumber == null || !assigned.has(opening.toNumber))).map(renderToGroup)}</section>] : [])
   }
 
-  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>채용현황 (BETA Test 중)</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
+  return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>전체 채용 현황</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="오픈 공고" value={`${active.length}개`} /><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /></div>
     <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={active} onSelectOpening={onSelectOpening} /></section>
     <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 해당 프로젝트의 전체 TO와 진행 중인 채용을 확인할 수 있어요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
-        const projectTarget = totalTargetTo(projectOpenings)
         const activeProjectTarget = totalTargetTo(activeOpenings)
         const projectKey = project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
         const projectTotal = data.projectTotals?.[projectKey]
@@ -336,9 +335,8 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const iconFiles: Record<string, string> = { 'ART실': 'art-photoshop.svg', ART: 'art-photoshop.svg', GDTS: 'gdts.png', OTPS: 'new-project.svg', MAZE: 'new-project.svg', HERO: 'new-project.svg', ZERO: 'zero.png', QA: 'qa-tools.svg', SERVER: 'server-wifi.svg', KONG: 'kong-person.svg' }
         const icon = iconFiles[projectKey]
         return <div className="org-project-entry" key={project}>
-          <button type="button" className={`org-project-row ${projectTotal != null ? 'has-project-total' : ''} ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
-              <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong>{projectTotal != null && <span className="org-project-headcount"><span>전체 TO <b>{projectTotal}명</b></span><span>채용중 TO <b>{activeProjectTarget}명</b></span></span>}</span></span>
-            {projectTotal == null && <span className="org-project-stat"><small>목표 TO</small><b>{projectTarget}명</b></span>}
+          <button type="button" className={`org-project-row has-project-total ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
+              <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong><span className="org-project-headcount">{projectTotal != null && <span>전체 TO <b>{projectTotal}명</b></span>}<span>채용중 TO <b>{activeProjectTarget}명</b></span></span></span></span>
             <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
           </button>
           {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>

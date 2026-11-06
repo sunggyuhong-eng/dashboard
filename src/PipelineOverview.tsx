@@ -28,7 +28,7 @@ type OperationsView = 'openings' | 'hires'
 const stageLabel: Record<PipelineStage, string> = {
   '온라인 과제': '온라인 과제', '코딩테스트': '코딩 테스트', '역량검사': '역량 검사',
   '면접': '면접', '1차 면접': '1차 면접', '2차 면접': '2차 면접',
-  '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼',
+  '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼', 'Hired': '입사 완료',
 }
 
 function candidateDates(candidate: Candidate): PipelineRow['dates'] {
@@ -88,14 +88,14 @@ function ProjectSection({ project, countLabel, children, defaultOpen = false }: 
   defaultOpen?: boolean
 }) {
   return <details className="operations-project" open={defaultOpen}>
-    <summary><strong>{project}</strong><span>{countLabel}</span><ChevronDown size={18} aria-hidden="true" /></summary>
+    <summary><span className="operations-project-count">{countLabel}</span><strong>{project}</strong><ChevronDown size={18} aria-hidden="true" /></summary>
     <div className="operations-project-content">{children}</div>
   </details>
 }
 
 function OpeningProgress({ opening }: { opening: Opening }) {
   const stageCounts = new Map<PipelineStage, number>()
-  opening.candidates.forEach(candidate => stageCounts.set(candidate.stage, (stageCounts.get(candidate.stage) || 0) + 1))
+  opening.candidates.filter(candidate => candidate.stage !== 'Hired').forEach(candidate => stageCounts.set(candidate.stage, (stageCounts.get(candidate.stage) || 0) + 1))
   const entries = [...stageCounts.entries()]
   return <div className="operations-progress">
     <span className="operations-field-label">진행 단계</span>
@@ -120,24 +120,26 @@ function OpeningGroups({ openings }: { openings: Opening[] }) {
 }
 
 function PlannedHireList({ openings }: { openings: Opening[] }) {
-  const projectMap = new Map<string, { opening: Opening; candidate: Candidate; date: string }[]>()
-  openings.filter(opening => opening.status === '진행중').forEach(opening => {
-    opening.candidates.filter(candidate => candidate.stage === 'Offer').forEach(candidate => {
-      const project = projectName(opening)
-      const list = projectMap.get(project) || []
-      list.push({ opening, candidate, date: offerDate(candidate.hireDate) })
-      projectMap.set(project, list)
-    })
+  const rows = openings.flatMap(opening => opening.candidates.flatMap(candidate => {
+    const isHired = candidate.stage === 'Hired'
+    if (!isHired && !(opening.status === '진행중' && candidate.stage === 'Offer')) return []
+    const rawDate = isHired ? candidate.offerDate || candidate.hireDate : candidate.hireDate
+    return [{ opening, candidate, isHired, date: offerDate(rawDate) }]
+  })).sort((a, b) => {
+    if (a.isHired !== b.isHired) return a.isHired ? -1 : 1
+    return a.isHired ? (b.date || '').localeCompare(a.date || '') : (a.date || '9999-12-31').localeCompare(b.date || '9999-12-31')
   })
-  const projects = sortProjectEntries([...projectMap.entries()])
-  return projects.length ? <div className="operations-project-list">{projects.map(([project, rows], index) => <ProjectSection key={project} project={project} countLabel={`입사 예정 ${rows.length}명`} defaultOpen={index === 0}>
-    <div className="operations-hires-list">{rows.sort((a, b) => (a.date || '9999-12-31').localeCompare(b.date || '9999-12-31')).map(({ opening, candidate, date }, rowIndex) => <article className="operations-hire-row" key={`${opening.id}:${candidate.id}:${rowIndex}`}>
+  return rows.length ? <div className="operations-hires-list">
+    <div className="operations-hires-heading"><b>입사 예정 {rows.filter(row => !row.isHired).length}명</b><span>입사 완료 {rows.filter(row => row.isHired).length}명</span></div>
+    <div className="operations-hire-table-head"><span>프로젝트 · TO</span><span>채용 직무</span><span>채용 사유</span><span>입사자</span><span>상태 · 날짜</span></div>
+    {rows.map(({ opening, candidate, isHired, date }) => <article className={`operations-hire-row ${isHired ? 'is-hired' : ''}`} key={`${opening.id}:${candidate.id}`}>
+      <div><span className="operations-field-label">프로젝트 · TO</span><strong>{projectName(opening)}{opening.toNumber ? ` · TO ${opening.toNumber}` : opening.toGroup ? ' · 공유 TO' : ''}</strong></div>
       <div><span className="operations-field-label">채용 직무</span><strong>{roleName(opening)}</strong></div>
       <div><span className="operations-field-label">채용 사유</span><span>{opening.reason || '채용 사유 미입력'}</span></div>
-      <div><span className="operations-field-label">입사 예정자</span><strong>{candidate.name || '이름 미입력'}</strong></div>
-      <div className="operations-hire-date"><span className="operations-field-label"><CalendarDays size={14} /> 입사 예정일</span><strong>{date ? date.replace(/-/g, '.') : '일정 미정'}</strong></div>
-    </article>)}</div>
-  </ProjectSection>)}</div> : <div className="operations-empty"><CalendarDays size={23} /><b>현재 입사 예정자가 없습니다.</b></div>
+      <div><span className="operations-field-label">{isHired ? '입사자' : '입사 예정자'}</span><strong>{candidate.name || '이름 미입력'}</strong></div>
+      <div className="operations-hire-date"><span className="operations-field-label">{isHired ? '오퍼 날짜' : '입사 예정일'}</span><strong>{date ? date.replace(/-/g, '.') : '일정 미정'}</strong></div>
+    </article>)}
+  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>입사 예정자와 최근 입사자가 없습니다.</b></div>
 }
 
 export function PipelineOverview({ openings, initialView = 'openings' }: { openings: Opening[]; initialView?: OperationsView }) {
@@ -147,6 +149,7 @@ export function PipelineOverview({ openings, initialView = 'openings' }: { openi
   const projectSections = byProject.map(([project, projectOpenings]) => ({ project, openings: projectOpenings, targetTo: totalTargetTo(projectOpenings) }))
   const plannedHireCount = active.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Offer').length, 0)
   const activeToCount = totalTargetTo(active)
+  const hiredCount = openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Hired').length, 0)
 
   return <section className="pipeline-overview" aria-label="프로젝트별 채용 운영">
     <div className="operations-view-tabs" role="tablist" aria-label="채용 운영 화면 선택">
@@ -154,7 +157,7 @@ export function PipelineOverview({ openings, initialView = 'openings' }: { openi
         <span>채용 진행 TO</span><b>{activeToCount}명</b>
       </button>
       <button type="button" role="tab" id="operations-tab-hires" aria-selected={view === 'hires'} aria-controls="operations-panel" onClick={() => setView('hires')}>
-        <span>입사 예정자</span><b>{plannedHireCount}명</b>
+        <span>입사 예정자</span><b>{plannedHireCount}명{hiredCount > 0 ? ` · 입사 ${hiredCount}명` : ''}</b>
       </button>
     </div>
     <div className="operations-panel" id="operations-panel" role="tabpanel" aria-labelledby={view === 'openings' ? 'operations-tab-openings' : 'operations-tab-hires'}>

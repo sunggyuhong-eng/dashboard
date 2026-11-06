@@ -109,6 +109,7 @@ function OpeningGroups({ openings }: { openings: Opening[] }) {
     <header><span>{group.shared ? '공유 TO' : '채용 중 TO'}</span>{group.targetTo > 0 && <b>목표 {group.targetTo}명</b>}</header>
     {group.openings.map(opening => <article className="operations-opening" key={opening.id}>
       <div className="operations-opening-main">
+        <span className="operations-field-label">채용 직무</span>
         <h4>{roleName(opening)}</h4>
         <p><strong>채용 사유</strong><span>{opening.reason || '채용 사유 미입력'}</span></p>
         {opening.approvalUrl && <a href={opening.approvalUrl} target="_blank" rel="noreferrer">채용승인신청서</a>}

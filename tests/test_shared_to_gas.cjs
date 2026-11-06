@@ -24,9 +24,24 @@ function read(openingValues) {
     ]),
   }
   // Only read APIs are provided: a sheet mutation would fail this test.
-  const context = vm.createContext({ SpreadsheetApp: { getActiveSpreadsheet: () => ({
-    getSheetByName: name => tabs[name] || null, getSpreadsheetTimeZone: () => 'Asia/Seoul',
-  }) } })
+  const context = vm.createContext({
+    SpreadsheetApp: { getActiveSpreadsheet: () => ({
+      getSheetByName: name => tabs[name] || null, getSpreadsheetTimeZone: () => 'Asia/Seoul',
+    }) },
+    // Apps Script provides Utilities; mirror the date formatting used by Code.gs in this VM.
+    Utilities: { formatDate: (date, timezone, pattern) => {
+      assert.equal(pattern, 'yyyy-MM-dd')
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date)
+      const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+      return `${values.year}-${values.month}-${values.day}`
+    } },
+    Session: { getScriptTimeZone: () => 'Asia/Seoul' },
+  })
   vm.runInContext(code, context)
   return JSON.parse(JSON.stringify(vm.runInContext('dashboard_()', context)))
 }

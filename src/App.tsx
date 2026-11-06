@@ -267,8 +267,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   </div>
 }
 
-const stageColorClasses: Record<PipelineStage, string> = { '온라인 과제':'task', '코딩테스트':'coding', '역량검사':'assessment', '면접':'interview', '1차 면접':'interview', '2차 면접':'interview', '면접합격':'interview', '처우단계':'compensation', 'Offer':'offer' }
-const stageDisplayLabels: Record<PipelineStage, string> = { '온라인 과제':'온라인 과제', '코딩테스트':'코딩 테스트', '역량검사':'역량 검사', '면접':'면접', '1차 면접':'1차 면접', '2차 면접':'2차 면접', '면접합격':'면접 합격', '처우단계':'처우 협의', 'Offer':'오퍼' }
+const stageColorClasses: Record<PipelineStage, string> = { '온라인 과제':'task', '코딩테스트':'coding', '역량검사':'assessment', '면접':'interview', '1차 면접':'interview', '2차 면접':'interview', '면접합격':'interview', '처우단계':'compensation', 'Offer':'offer', 'Hired':'hired' }
+const stageDisplayLabels: Record<PipelineStage, string> = { '온라인 과제':'온라인 과제', '코딩테스트':'코딩 테스트', '역량검사':'역량 검사', '면접':'면접', '1차 면접':'1차 면접', '2차 면접':'2차 면접', '면접합격':'면접 합격', '처우단계':'처우 협의', 'Offer':'오퍼', 'Hired':'입사 완료' }
 function stageClass(stage: PipelineStage) { return stageColorClasses[stage] }
 function stageLabel(stage: PipelineStage) { return stageDisplayLabels[stage] }
 
@@ -277,7 +277,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
 
   const active = data.openings.filter(opening => opening.status === '진행중')
-  const candidates = active.flatMap(opening => opening.candidates)
+  const candidates = active.flatMap(opening => opening.candidates.filter(candidate => candidate.stage !== 'Hired'))
   const targetTo = totalTargetTo(active)
   const plannedHireCount = active.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Offer').length, 0)
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
@@ -293,7 +293,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
 
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>전체 채용 현황</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="오픈 공고" value={`${active.length}개`} /><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /></div>
-    <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={active} /></section>
+    <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={data.openings} /></section>
     <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 전체 TO와 구성원 상태를 확인할 수 있어요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')

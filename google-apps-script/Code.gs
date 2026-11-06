@@ -97,6 +97,7 @@ function dashboard_() {
   var candidateTable = table_(interview, ['진행단계','이름','직무(공고명)']);
   var col = candidateTable.columns;
   var hireDateColumn = firstColumn_(col, ['입사일', '입사 확정 날짜', '입사확정날짜', '입사 확정일', '입사확정일', '입사예정일']);
+  var offerDateColumn = firstColumn_(col, ['오퍼 날짜', '오퍼날짜', 'Offer Date', 'Offer date']);
   var firstInterviewColumn = firstColumn_(col, ['1차 면접 날짜', '1차면접날짜', '1차 면접일', '1차면접일', '1차 면접']);
   var secondInterviewColumn = firstColumn_(col, ['2차 면접 날짜', '2차면접날짜', '2차 면접일', '2차면접일', '2차 면접']);
   var timezone = ss.getSpreadsheetTimeZone();
@@ -113,7 +114,7 @@ function dashboard_() {
     if (!title) continue;
     var openingKey = key_(project, title);
     if (stage === 'Hired') hiredCounts[openingKey] = (hiredCounts[openingKey] || 0) + 1;
-    if (name && ACTIVE_STAGES.indexOf(stage) >= 0) {
+    if (name && (ACTIVE_STAGES.indexOf(stage) >= 0 || stage === 'Hired')) {
       candidates.push({
         id: 'row-' + (i + 1),
         row: i + 1,
@@ -122,6 +123,7 @@ function dashboard_() {
         project: project,
         openingTitle: title,
         hireDate: dateValue_(rawRow, row, hireDateColumn, timezone),
+        offerDate: dateValue_(rawRow, row, offerDateColumn, timezone),
         firstInterviewDate: dateValue_(rawRow, row, firstInterviewColumn, timezone),
         secondInterviewDate: dateValue_(rawRow, row, secondInterviewColumn, timezone)
       });

@@ -1,6 +1,6 @@
 export const PIPELINE_STAGES = [
   '온라인 과제', '코딩테스트', '역량검사', '면접', '1차 면접',
-  '2차 면접', '면접합격', '처우단계', 'Offer',
+  '2차 면접', '면접합격', '처우단계', 'Offer', 'Hired',
 ] as const
 
 export type PipelineStage = typeof PIPELINE_STAGES[number]
@@ -13,6 +13,7 @@ export type Candidate = {
   project: string
   openingTitle: string
   hireDate?: string
+  offerDate?: string
   firstInterviewDate?: string
   secondInterviewDate?: string
 }

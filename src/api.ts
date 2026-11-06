@@ -3,7 +3,7 @@ import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
 type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown; status?: unknown; toNumber?: unknown }
-type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
+type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; offerDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
 type SheetPayload = {
   ok?: boolean
   error?: string
@@ -28,7 +28,7 @@ export function normalizePipelineStage(value: unknown): PipelineStage | null {
     '코딩테스트': '코딩테스트', '역량검사': '역량검사',
     '면접': '면접', '1차면접': '1차 면접', '2차면접': '2차 면접',
     '면접합격': '면접합격', '처우단계': '처우단계', '처우협의': '처우단계',
-    'offer': 'Offer', '오퍼': 'Offer',
+    'offer': 'Offer', '오퍼': 'Offer', 'hired': 'Hired', '입사완료': 'Hired',
   }
   return aliases[key] || null
 }
@@ -80,6 +80,7 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
       project: clean(source.project),
       openingTitle: clean(source.openingTitle),
       hireDate: clean(source.hireDate),
+      offerDate: clean(source.offerDate),
       firstInterviewDate: clean(source.firstInterviewDate),
       secondInterviewDate: clean(source.secondInterviewDate),
     }
@@ -108,7 +109,7 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
   groupOpeningsByTo(openings)
   return {
     openings,
-    candidateCount: openings.reduce((sum, opening) => sum + opening.candidates.length, 0),
+    candidateCount: openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage !== 'Hired').length, 0),
     syncedAt: payload.syncedAt || new Date().toISOString(),
     sheetApiUrl: previous?.sheetApiUrl || '',
     projectTotals: Object.fromEntries(Object.entries(payload.projectTotals || {}).map(([project, total]) => [

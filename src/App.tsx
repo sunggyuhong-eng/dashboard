@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowLeft, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
-import { PipelineOverview } from './PipelineOverview'
+import { collectPlannedHires, PipelineOverview } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage, type ProjectTableSlot } from './types'
@@ -263,7 +263,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     <div className="workspace"><main className="content">{error ? <ErrorState message={error} retry={load} /> : loading && !data ? <Loading label="채용 현황을 불러오는 중이에요" /> : selectedId === REPORT_ID && data ? <OverviewReport data={data} onSelectOpening={setSelectedId} /> : selected ? <OpeningBoard opening={selected} openings={data!.openings} onBack={goHome} /> : <EmptyState />}</main></div>
     {refreshNotice && <div className="toast">{refreshNotice}</div>}
     {data && <InterviewCalendar openings={data.openings} />}
-    <footer><span>마지막 동기화 {data?.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</span><span>진행 지원자 {data?.candidateCount || 0}명</span></footer>
   </div>
 }
 
@@ -279,7 +278,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   const active = data.openings.filter(opening => opening.status === '진행중')
   const candidates = active.flatMap(opening => opening.candidates.filter(candidate => candidate.stage !== 'Hired'))
   const targetTo = totalTargetTo(active)
-  const plannedHireCount = active.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Offer').length, 0)
+  const plannedHireCount = collectPlannedHires(data.openings).length
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
   const allProjects = groupOpeningsByProject(data.openings)
   const projectOrder = ['ART실', 'GDTS', 'OTPS', 'MAZE', 'HERO', 'ZERO', 'QA', 'SERVER', 'KONG']
@@ -292,9 +291,9 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   const openReport = () => setReportOpen(true)
 
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>전체 채용 현황</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
-    <div className="report-kpis"><Summary label="오픈 공고" value={`${active.length}개`} /><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /></div>
-    <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={data.openings} completedHires={data.completedHires} /></section>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 전체 TO와 구성원 상태를 확인할 수 있어요.</p></div></header>
+    <div className="report-kpis"><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /><Summary label="오픈 공고" value={`${active.length}개`} /></div>
+    <section className="recruiting-operations"><header><div><h2>채용 진행 TO</h2><p className="section-description">프로젝트별 채용 직무와 진행 단계를 확인하세요.</p></div></header><PipelineOverview openings={data.openings} completedHires={data.completedHires} /></section>
+    <article className="project-overview"><header><div><h2>프로젝트 TO 현황</h2><p>전체 인원과 TO 자리 구성을 확인하세요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
         const activeProjectTarget = totalTargetTo(activeOpenings)

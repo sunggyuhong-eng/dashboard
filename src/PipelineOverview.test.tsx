@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
-import { collectPipelineRows, PIPELINE_GROUPS, PipelineOverview } from './PipelineOverview'
+import { collectPipelineRows, collectPlannedHires, PIPELINE_GROUPS, PipelineOverview } from './PipelineOverview'
+import { OverviewReport } from './App'
 
 describe('전형별 지원자 목록', () => {
   it('공유 TO 공고도 지원자를 합치거나 중복 제거하지 않고 다섯 전형에 정확히 연결한다', async () => {
@@ -88,5 +89,20 @@ describe('전형별 지원자 목록', () => {
     expect(html.indexOf('박나')).toBeLessThan(html.indexOf('2026.10.26'))
     expect(html.indexOf('이다')).toBeLessThan(html.indexOf('2026.10.26'))
     expect(html.match(/2026\.11\.02/g)).toHaveLength(1)
+  })
+
+  it('상단 입사 예정자와 탭은 지난 입사일을 제외한 같은 목록을 집계한다', async () => {
+    const data = await buildLiveDashboard(structuredClone(fixture), null)
+    const offer = data.openings.flatMap(opening => opening.candidates).find(candidate => candidate.stage === 'Offer')!
+    offer.offerDate = '2020-01-01'
+    expect(collectPlannedHires(data.openings, '2026-11-06')).toHaveLength(0)
+    let html = renderToStaticMarkup(<OverviewReport data={data} />)
+    expect(html).toMatch(/입사 예정자<\/span><b>0명/)
+    expect(html).toContain('id="operations-tab-hires" aria-selected="false" aria-controls="operations-panel"><span>입사 예정자</span><b>0명')
+    offer.offerDate = '2099-01-01'
+    html = renderToStaticMarkup(<OverviewReport data={data} />)
+    expect(html).toMatch(/입사 예정자<\/span><b>1명/)
+    expect(html).toContain('id="operations-tab-hires" aria-selected="false" aria-controls="operations-panel"><span>입사 예정자</span><b>1명')
+    expect(collectPlannedHires(data.openings, '2026-11-06')).toHaveLength(1)
   })
 })

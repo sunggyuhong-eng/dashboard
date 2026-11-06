@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { CalendarDays, ChevronDown, UsersRound } from 'lucide-react'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { offerDate } from './OfferOverview'
-import type { Candidate, Opening, PipelineStage } from './types'
+import type { Candidate, CompletedHire, Opening, PipelineStage } from './types'
 
 export const PIPELINE_GROUPS = [
   { id: 'task', label: '온라인 과제', stages: ['온라인 과제'] },
@@ -149,33 +149,24 @@ function PlannedHireList({ openings }: { openings: Opening[] }) {
   </div> : <div className="operations-empty"><CalendarDays size={23} /><b>현재 입사 예정자가 없습니다.</b></div>
 }
 
-function CompletedToList({ openings, unmatchedCompletedHires = [] }: { openings: Opening[]; unmatchedCompletedHires?: Candidate[] }) {
-  const today = todayDateString()
-  const linkedRows = openings.flatMap(opening => opening.candidates.flatMap(candidate => {
-    const date = offerDate(candidate.offerDate)
-    return date && date <= today ? [{ key: `${opening.id}:${candidate.id}`, project: projectName(opening), title: roleName(opening), reason: opening.reason, candidate, date }] : []
-  }))
-  const unlinkedRows = unmatchedCompletedHires.flatMap(candidate => {
-    const date = offerDate(candidate.offerDate)
-    return date && date <= today ? [{ key: `unlinked:${candidate.id}`, project: candidate.project || '프로젝트 미입력', title: candidate.openingTitle || '채용 직무 미입력', reason: '', candidate, date }] : []
-  })
-  const rows = [...linkedRows, ...unlinkedRows].sort((a, b) => (b.date || '').localeCompare(a.date || '')
-    || a.project.localeCompare(b.project, 'ko')
-    || a.candidate.name.localeCompare(b.candidate.name, 'ko'))
+function CompletedToList({ completedHires }: { completedHires: CompletedHire[] }) {
+  const rows = [...completedHires].sort((a, b) => (offerDate(b.hireDate) || '').localeCompare(offerDate(a.hireDate) || '')
+    || a.name.localeCompare(b.name, 'ko'))
   return rows.length ? <div className="operations-completed-list">
     <div className="operations-hires-heading"><b>입사 완료 {rows.length}명</b></div>
-    <div className="operations-completed-table-head"><span>프로젝트</span><span>입사자</span><span>채용 직무</span><span>채용 사유</span><span>입사 완료 날짜</span></div>
-    {rows.map(({ key, project, title, reason, candidate, date }) => <article className="operations-completed-row" key={key}>
-      <div><strong>{project}</strong></div>
-      <div><strong>{candidate.name || '이름 미입력'}</strong></div>
-      <div><strong>{title}</strong></div>
-      <div><span>{reason || '채용 사유 미입력'}</span></div>
-      <div className="operations-completed-date"><strong>{date.replace(/-/g, '.')}</strong></div>
+    <div className="operations-completed-table-head"><span>이름</span><span>소속</span><span>팀</span><span>Title</span><span>계약형태</span><span>입사날짜</span></div>
+    {rows.map((hire, index) => <article className="operations-completed-row" key={`${hire.name}:${hire.hireDate}:${index}`}>
+      <div><strong>{hire.name}</strong></div>
+      <div><strong>{hire.organization || '—'}</strong></div>
+      <div><span>{hire.team || '—'}</span></div>
+      <div><strong>{hire.title || '—'}</strong></div>
+      <div><span>{hire.employmentType || '—'}</span></div>
+      <div className="operations-completed-date"><strong>{offerDate(hire.hireDate).replace(/-/g, '.') || '날짜 미입력'}</strong></div>
     </article>)}
-  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>입사 완료된 TO가 없습니다.</b></div>
+  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>입사 완료자가 없습니다.</b></div>
 }
 
-export function PipelineOverview({ openings, unmatchedCompletedHires = [], initialView = 'openings' }: { openings: Opening[]; unmatchedCompletedHires?: Candidate[]; initialView?: OperationsView }) {
+export function PipelineOverview({ openings, completedHires = [], initialView = 'openings' }: { openings: Opening[]; completedHires?: CompletedHire[]; initialView?: OperationsView }) {
   const [view, setView] = useState<OperationsView>(initialView)
   const active = openings.filter(opening => opening.status === '진행중')
   const byProject = sortProjectEntries([...groupOpeningsByProject(active).entries()])
@@ -187,8 +178,7 @@ export function PipelineOverview({ openings, unmatchedCompletedHires = [], initi
   }).length, 0)
   const activeToCount = totalTargetTo(active)
   const monday = thisWeekMonday()
-  const mondayHireCount = openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => offerDate(candidate.offerDate) === monday).length, 0)
-    + unmatchedCompletedHires.filter(candidate => offerDate(candidate.offerDate) === monday).length
+  const mondayHireCount = completedHires.filter(hire => offerDate(hire.hireDate) === monday).length
 
   return <section className="pipeline-overview" aria-label="프로젝트별 채용 운영">
     <div className="operations-view-tabs" role="tablist" aria-label="채용 운영 화면 선택">
@@ -199,14 +189,14 @@ export function PipelineOverview({ openings, unmatchedCompletedHires = [], initi
         <span>입사 예정자</span><b>{plannedHireCount}명</b>
       </button>
       <button type="button" role="tab" id="operations-tab-completed" aria-selected={view === 'completed'} aria-controls="operations-panel" onClick={() => setView('completed')}>
-        <span>완료된 TO</span><b>이번 주 월요일 입사 {mondayHireCount}명</b>
+        <span>입사 완료자</span><b>이번 주 월요일 {mondayHireCount}명</b>
       </button>
     </div>
     <div className={`operations-panel view-${view}`} id="operations-panel" role="tabpanel" aria-labelledby={`operations-tab-${view}`}>
       {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, targetTo }, index) => <ProjectSection key={project} project={project} countLabel={`채용중 TO ${targetTo}명`} defaultOpen={index === 0}>
         <OpeningGroups openings={projectOpenings} />
       </ProjectSection>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 진행 중인 채용 TO가 없습니다.</b></div>
-      : view === 'hires' ? <PlannedHireList openings={openings} /> : <CompletedToList openings={openings} unmatchedCompletedHires={unmatchedCompletedHires} />}
+      : view === 'hires' ? <PlannedHireList openings={openings} /> : <CompletedToList completedHires={completedHires} />}
     </div>
   </section>
 }

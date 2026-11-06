@@ -105,6 +105,8 @@ function dashboard_() {
   var todayDate = Utilities.formatDate(reportNow, timezone, 'yyyy-MM-dd');
   var candidates = [];
   var hiredCounts = {};
+  var completedHireSheet = findSheet_(ss, ['입사 완료자']);
+  var completedHires = completedHireSheet ? completedHires_(completedHireSheet, timezone) : [];
 
   for (var i = candidateTable.headerRow; i < candidateTable.values.length; i++) {
     var row = candidateTable.values[i];
@@ -139,11 +141,34 @@ function dashboard_() {
     ok: true,
     openings: openings,
     candidates: candidates,
+    completedHires: completedHires,
     hiredCounts: hiredCounts,
     projectTotals: projectTotals,
     projectTables: projectTables,
     syncedAt: new Date().toISOString()
   };
+}
+
+function completedHires_(sheet, timezone) {
+  var range = sheet.getDataRange();
+  var values = range.getDisplayValues();
+  var rawValues = range.getValues();
+  var result = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var raw = rawValues[i] || [];
+    var name = clean_(row[0]);
+    if (!name) continue;
+    result.push({
+      name: name,
+      organization: clean_(row[1]),
+      team: clean_(row[2]),
+      title: clean_(row[3]),
+      employmentType: clean_(row[4]),
+      hireDate: dateValue_(raw, row, 5, timezone)
+    });
+  }
+  return result;
 }
 
 function mazeTable_(sheet, openingTable) {

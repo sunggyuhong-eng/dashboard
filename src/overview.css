@@ -469,11 +469,12 @@
 .operations-hire-row strong { color: #111820; font-size: 14px; font-weight: 650; }
 .operations-hire-date>strong { color: #168348; }
 .operations-completed-list { display: flex; min-width: 0; flex-direction: column; background: #fff; }
-.operations-completed-table-head, .operations-completed-row { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(90px, .85fr) minmax(150px, 1.35fr) minmax(150px, 1.4fr) minmax(130px, .95fr); gap: 14px; }
+.operations-completed-table-head, .operations-completed-row { display: grid; grid-template-columns: minmax(80px, .7fr) minmax(95px, .8fr) minmax(110px, 1fr) minmax(180px, 1.5fr) minmax(150px, 1.3fr) minmax(115px, .9fr); gap: 14px; }
 .operations-completed-table-head { padding: 12px 8px; border-bottom: 1px solid #dfe4ea; background: #fff; color: #263241; font-size: 13px; font-weight: 750; }
 .operations-completed-row { align-items: center; padding: 16px 8px; border-bottom: 1px solid #eef0f2; background: #fff; }
 .operations-completed-row:last-child { border-bottom: 0; }
 .operations-completed-row>div { min-width: 0; color: #111820; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.operations-completed-row>div:nth-child(5) { white-space: pre-line; }
 .operations-completed-row strong { color: #111820; font-size: 14px; font-weight: 650; }
 .operations-completed-date>strong { color: #4d5967; }
 .operations-empty { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #929daa; }
@@ -484,7 +485,8 @@
 @media (max-width: 850px) {
   .operations-opening { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .operations-panel.view-hires, .operations-panel.view-completed { overflow-x: auto; }
-  .operations-hire-table-head, .operations-hire-row, .operations-completed-table-head, .operations-completed-row { min-width: 760px; }
+  .operations-hire-table-head, .operations-hire-row { min-width: 760px; }
+  .operations-completed-table-head, .operations-completed-row { min-width: 900px; }
 }
 @media (max-width: 560px) {
   .operations-view-tabs { gap: 6px; }

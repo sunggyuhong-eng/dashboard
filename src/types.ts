@@ -19,6 +19,15 @@ export type Candidate = {
   secondInterviewDate?: string
 }
 
+export type CompletedHire = {
+  name: string
+  organization: string
+  team: string
+  title: string
+  employmentType: string
+  hireDate: string
+}
+
 export type Opening = {
   id: string
   title: string
@@ -58,7 +67,7 @@ export type ProjectTable = {
 
 export type DashboardData = {
   openings: Opening[]
-  unmatchedCompletedHires?: Candidate[]
+  completedHires?: CompletedHire[]
   syncedAt: string
   candidateCount: number
   sheetApiUrl?: string

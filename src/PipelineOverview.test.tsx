@@ -69,7 +69,7 @@ describe('전형별 지원자 목록', () => {
     const hireHtml = renderToStaticMarkup(<PipelineOverview openings={data.openings} initialView="hires" />)
     expect(hireHtml).toContain('id="operations-tab-hires" aria-selected="true"')
     expect(hireHtml).toContain('테스트 D')
-    expect(hireHtml).toContain('입사 예정일')
+    expect(hireHtml).toContain('입사 예정 날짜')
     expect(hireHtml).toContain('일정 미정')
     const empty = renderToStaticMarkup(<PipelineOverview openings={[]} />)
     expect(empty).toContain('현재 진행 중인 채용 TO가 없습니다.')

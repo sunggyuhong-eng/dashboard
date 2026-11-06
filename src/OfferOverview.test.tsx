@@ -76,6 +76,6 @@ describe('오퍼 · 입사 예정', () => {
     expect(html).toContain('operations-stage-chip')
     const hireHtml = renderToStaticMarkup(<PipelineOverview openings={data.openings} initialView="hires" />)
     expect(hireHtml).toContain('id="operations-tab-hires" aria-selected="true"')
-    expect(hireHtml).toContain('입사 예정일')
+    expect(hireHtml).toContain('입사 예정 날짜')
   })
 })

@@ -139,7 +139,7 @@ function PlannedHireList({ openings }: { openings: Opening[] }) {
       <div><span className="operations-field-label">{isHired ? '입사자' : '입사 예정자'}</span><strong>{candidate.name || '이름 미입력'}</strong></div>
       <div className="operations-hire-date"><span className="operations-field-label">{isHired ? '오퍼 날짜' : '입사 예정일'}</span><strong>{date ? date.replace(/-/g, '.') : '일정 미정'}</strong></div>
     </article>)}
-  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>입사 예정자와 최근 입사자가 없습니다.</b></div>
+  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>현재 입사 예정자가 없습니다.</b><span>입사 완료자도 없습니다.</span></div>
 }
 
 export function PipelineOverview({ openings, initialView = 'openings' }: { openings: Opening[]; initialView?: OperationsView }) {

@@ -1,4 +1,4 @@
-import { PIPELINE_STAGES, type Candidate, type DashboardData, type Opening, type PipelineStage, type ProjectTable } from './types'
+import { type Candidate, type CandidateStage, type DashboardData, type Opening, type ProjectTable } from './types'
 import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
@@ -19,11 +19,11 @@ const clean = (value: unknown) => String(value ?? '').trim()
 const normalized = (value: unknown) => clean(value).replace(/\s+/g, ' ').toLowerCase()
 const openingKey = (project: unknown, title: unknown) => `${normalized(project)}\u001f${normalized(title)}`
 
-export function normalizePipelineStage(value: unknown): PipelineStage | null {
+export function normalizePipelineStage(value: unknown): CandidateStage | null {
   const key = normalized(value).replace(/[\s_-]+/g, '')
   if (key.includes('코딩') || key.includes('coding')) return '코딩테스트'
   if (key.includes('과제') || key.includes('assignment') || key === 'task' || key.includes('onlinetask')) return '온라인 과제'
-  const aliases: Record<string, PipelineStage> = {
+  const aliases: Record<string, CandidateStage> = {
     '온라인과제': '온라인 과제', '온라인과제전형': '온라인 과제',
     '코딩테스트': '코딩테스트', '역량검사': '역량검사',
     '면접': '면접', '1차면접': '1차 면접', '2차면접': '2차 면접',

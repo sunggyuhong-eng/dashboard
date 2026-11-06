@@ -1,15 +1,16 @@
 export const PIPELINE_STAGES = [
   '온라인 과제', '코딩테스트', '역량검사', '면접', '1차 면접',
-  '2차 면접', '면접합격', '처우단계', 'Offer', 'Hired',
+  '2차 면접', '면접합격', '처우단계', 'Offer',
 ] as const
 
 export type PipelineStage = typeof PIPELINE_STAGES[number]
+export type CandidateStage = PipelineStage | 'Hired'
 
 export type Candidate = {
   id: string
   row: number
   name: string
-  stage: PipelineStage
+  stage: CandidateStage
   project: string
   openingTitle: string
   hireDate?: string

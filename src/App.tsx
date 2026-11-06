@@ -267,8 +267,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   </div>
 }
 
-const stageColorClasses: Record<PipelineStage, string> = { '온라인 과제':'task', '코딩테스트':'coding', '역량검사':'assessment', '면접':'interview', '1차 면접':'interview', '2차 면접':'interview', '면접합격':'interview', '처우단계':'compensation', 'Offer':'offer', 'Hired':'hired' }
-const stageDisplayLabels: Record<PipelineStage, string> = { '온라인 과제':'온라인 과제', '코딩테스트':'코딩 테스트', '역량검사':'역량 검사', '면접':'면접', '1차 면접':'1차 면접', '2차 면접':'2차 면접', '면접합격':'면접 합격', '처우단계':'처우 협의', 'Offer':'오퍼', 'Hired':'입사 완료' }
+const stageColorClasses: Record<PipelineStage, string> = { '온라인 과제':'task', '코딩테스트':'coding', '역량검사':'assessment', '면접':'interview', '1차 면접':'interview', '2차 면접':'interview', '면접합격':'interview', '처우단계':'compensation', 'Offer':'offer' }
+const stageDisplayLabels: Record<PipelineStage, string> = { '온라인 과제':'온라인 과제', '코딩테스트':'코딩 테스트', '역량검사':'역량 검사', '면접':'면접', '1차 면접':'1차 면접', '2차 면접':'2차 면접', '면접합격':'면접 합격', '처우단계':'처우 협의', 'Offer':'오퍼' }
 function stageClass(stage: PipelineStage) { return stageColorClasses[stage] }
 function stageLabel(stage: PipelineStage) { return stageDisplayLabels[stage] }
 

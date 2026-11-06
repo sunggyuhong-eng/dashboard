@@ -28,7 +28,7 @@ type OperationsView = 'openings' | 'hires'
 const stageLabel: Record<PipelineStage, string> = {
   '온라인 과제': '온라인 과제', '코딩테스트': '코딩 테스트', '역량검사': '역량 검사',
   '면접': '면접', '1차 면접': '1차 면접', '2차 면접': '2차 면접',
-  '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼', 'Hired': '입사 완료',
+  '면접합격': '면접 합격', '처우단계': '처우 협의', 'Offer': '오퍼',
 }
 
 function candidateDates(candidate: Candidate): PipelineRow['dates'] {
@@ -46,7 +46,7 @@ function candidateDates(candidate: Candidate): PipelineRow['dates'] {
 export function collectPipelineRows(openings: Opening[], groupId: PipelineGroupId): PipelineRow[] {
   const group = PIPELINE_GROUPS.find(item => item.id === groupId)!
   return openings.filter(opening => opening.status === '진행중').flatMap(opening =>
-    opening.candidates.filter(candidate => (group.stages as readonly PipelineStage[]).includes(candidate.stage)).map((candidate, index) => ({
+  opening.candidates.filter(candidate => candidate.stage !== 'Hired' && (group.stages as readonly PipelineStage[]).includes(candidate.stage)).map((candidate, index) => ({
       key: `${opening.id}:${candidate.id}:${index}`,
       openingId: opening.id,
       project: projectName(opening),
@@ -95,7 +95,7 @@ function ProjectSection({ project, countLabel, children, defaultOpen = false }: 
 
 function OpeningProgress({ opening }: { opening: Opening }) {
   const stageCounts = new Map<PipelineStage, number>()
-  opening.candidates.filter(candidate => candidate.stage !== 'Hired').forEach(candidate => stageCounts.set(candidate.stage, (stageCounts.get(candidate.stage) || 0) + 1))
+  opening.candidates.filter((candidate): candidate is Candidate & { stage: PipelineStage } => candidate.stage !== 'Hired').forEach(candidate => stageCounts.set(candidate.stage, (stageCounts.get(candidate.stage) || 0) + 1))
   const entries = [...stageCounts.entries()]
   return <div className="operations-progress">
     <span className="operations-field-label">진행 단계</span>

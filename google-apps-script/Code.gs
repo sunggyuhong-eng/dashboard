@@ -102,8 +102,7 @@ function dashboard_() {
   var secondInterviewColumn = firstColumn_(col, ['2차 면접 날짜', '2차면접날짜', '2차 면접일', '2차면접일', '2차 면접']);
   var timezone = ss.getSpreadsheetTimeZone();
   var reportNow = new Date();
-  var currentMonday = mondayOfCurrentWeek_(reportNow, timezone);
-  var previousMonday = previousMonday_(reportNow, timezone);
+  var todayDate = Utilities.formatDate(reportNow, timezone, 'yyyy-MM-dd');
   var candidates = [];
   var hiredCounts = {};
 
@@ -116,14 +115,16 @@ function dashboard_() {
     var project = col['PJ'] == null ? '' : clean_(row[col['PJ']]);
     if (!title) continue;
     var offerDate = dateValue_(rawRow, row, offerDateColumn, timezone);
+    var isPastOfferDate = !!offerDate && offerDate < todayDate;
     var openingKey = key_(project, title);
     if (stage === 'Hired') hiredCounts[openingKey] = (hiredCounts[openingKey] || 0) + 1;
-    if (name && (ACTIVE_STAGES.indexOf(stage) >= 0 || (offerDate >= previousMonday && offerDate < currentMonday))) {
+    // E열 입사예정일이 오늘보다 이전이면, 진행단계와 무관하게 입사 완료자로 전달합니다.
+    if (name && (ACTIVE_STAGES.indexOf(stage) >= 0 || isPastOfferDate)) {
       candidates.push({
         id: 'row-' + (i + 1),
         row: i + 1,
         name: name,
-        stage: ACTIVE_STAGES.indexOf(stage) >= 0 ? stage : 'Hired',
+        stage: isPastOfferDate ? 'Hired' : stage,
         project: project,
         openingTitle: title,
         hireDate: dateValue_(rawRow, row, hireDateColumn, timezone),

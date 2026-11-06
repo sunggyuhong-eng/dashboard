@@ -469,13 +469,14 @@
 .operations-hire-date>strong { color: #168348; }
 .operations-hire-row.is-hired { background: #fbfcfd; }
 .operations-hire-row.is-hired .operations-hire-date>strong { color: #354252; }
-.operations-completed-list { padding: 0 14px; }
-.operations-completed-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) auto; align-items: center; gap: 16px; padding: 14px 2px; border-bottom: 1px solid #eef0f2; }
+.operations-completed-list { display: flex; min-width: 0; flex-direction: column; }
+.operations-completed-table-head, .operations-completed-row { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(90px, .85fr) minmax(150px, 1.35fr) minmax(150px, 1.4fr) minmax(130px, .95fr); gap: 14px; }
+.operations-completed-table-head { padding: 9px 4px; border-bottom: 1px solid #dfe4ea; color: #687585; font-size: 11px; font-weight: 700; }
+.operations-completed-row { align-items: center; padding: 14px 4px; border-bottom: 1px solid #eef0f2; }
 .operations-completed-row:last-child { border-bottom: 0; }
 .operations-completed-row>div { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: #202936; font-size: 12px; line-height: 1.5; }
 .operations-completed-row strong { color: #111820; font-size: 13px; }
-.operations-completed-row>a { color: #145fc7; font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
-.operations-completed-row>a:hover { text-decoration: underline; }
+.operations-completed-date>strong { color: #4d5967; }
 .operations-empty { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #929daa; }
 .operations-empty>b { color: #5f6b78; font-size: 13px; }
 .org-project-row, .org-project-row.has-project-total { grid-template-columns: minmax(0, 1fr) auto 20px; }
@@ -485,8 +486,8 @@
   .operations-opening { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .operations-hire-table-head { display: none; }
   .operations-hire-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operations-completed-table-head { display: none; }
   .operations-completed-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .operations-completed-row>a { grid-column: 1 / -1; }
 }
 @media (max-width: 560px) {
   .operations-view-tabs { gap: 6px; }
@@ -498,9 +499,8 @@
   .operations-to-group>header { padding-right: 9px; padding-left: 9px; }
   .operations-opening { padding: 12px 9px; }
   .operations-hire-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .operations-completed-list { padding: 0 9px; }
+  .operations-completed-list { padding: 0 4px; }
   .operations-completed-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .operations-completed-row>a { grid-column: 1; }
   .org-project-row, .org-project-row.has-project-total { grid-template-columns: minmax(0, 1fr) 18px; }
   .org-project-row .org-project-stat { grid-column: 1; }
   .org-project-row.has-project-total>svg, .org-project-row>svg { grid-column: 2; grid-row: 1; }

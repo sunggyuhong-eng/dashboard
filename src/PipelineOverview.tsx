@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { CalendarDays, ChevronDown, UsersRound } from 'lucide-react'
-import { groupOpeningsByProject, groupOpeningsByTo, projectName } from './headcount'
+import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { offerDate } from './OfferOverview'
 import type { Candidate, Opening, PipelineStage } from './types'
 
@@ -144,21 +144,21 @@ export function PipelineOverview({ openings, initialView = 'openings' }: { openi
   const [view, setView] = useState<OperationsView>(initialView)
   const active = openings.filter(opening => opening.status === '진행중')
   const byProject = sortProjectEntries([...groupOpeningsByProject(active).entries()])
-  const projectSections = byProject.map(([project, projectOpenings]) => ({ project, openings: projectOpenings, toCount: groupOpeningsByTo(projectOpenings).length }))
+  const projectSections = byProject.map(([project, projectOpenings]) => ({ project, openings: projectOpenings, targetTo: totalTargetTo(projectOpenings) }))
   const plannedHireCount = active.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Offer').length, 0)
-  const activeToCount = projectSections.reduce((sum, section) => sum + section.toCount, 0)
+  const activeToCount = totalTargetTo(active)
 
   return <section className="pipeline-overview" aria-label="프로젝트별 채용 운영">
     <div className="operations-view-tabs" role="tablist" aria-label="채용 운영 화면 선택">
       <button type="button" role="tab" id="operations-tab-openings" aria-selected={view === 'openings'} aria-controls="operations-panel" onClick={() => setView('openings')}>
-        <span>채용 진행 TO</span><b>{activeToCount}개</b>
+        <span>채용 진행 TO</span><b>{activeToCount}명</b>
       </button>
       <button type="button" role="tab" id="operations-tab-hires" aria-selected={view === 'hires'} aria-controls="operations-panel" onClick={() => setView('hires')}>
         <span>입사 예정자</span><b>{plannedHireCount}명</b>
       </button>
     </div>
     <div className="operations-panel" id="operations-panel" role="tabpanel" aria-labelledby={view === 'openings' ? 'operations-tab-openings' : 'operations-tab-hires'}>
-      {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, toCount }, index) => <ProjectSection key={project} project={project} countLabel={`채용중 TO ${toCount}개`} defaultOpen={index === 0}>
+      {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, targetTo }, index) => <ProjectSection key={project} project={project} countLabel={`채용중 TO ${targetTo}명`} defaultOpen={index === 0}>
         <OpeningGroups openings={projectOpenings} />
       </ProjectSection>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 진행 중인 채용 TO가 없습니다.</b></div>
       : <PlannedHireList openings={active} />}

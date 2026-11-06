@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
 import { OverviewReport } from './App'
+import { PipelineOverview } from './PipelineOverview'
 import { collectOffers, offerDate, OfferOverview } from './OfferOverview'
 
 describe('오퍼 · 입사 예정', () => {
@@ -62,16 +63,19 @@ describe('오퍼 · 입사 예정', () => {
     expect(renderToStaticMarkup(<OfferOverview openings={hired.openings} />)).toContain('진행 중인 오퍼가 없습니다.')
   })
 
-  it('공유 TO 합계와 공고별 오퍼 수를 유지하며 요약 안에 오퍼 패널을 표시한다', async () => {
+  it('공유 TO 합계를 유지하고 입사 예정자를 별도 탭으로 제공한다', async () => {
     const data = await buildLiveDashboard(structuredClone(fixture), null)
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/목표 TO<\/span><b>3명/)
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
-    expect(html).toContain('id="pipeline-tab-offer" aria-selected="true"')
-    expect(html).toContain('오퍼 지원자 <span>1명</span>')
+    expect(html).toContain('id="operations-tab-openings" aria-selected="true"')
+    expect(html).toContain('id="operations-tab-hires" aria-selected="false"')
+    expect(html).toContain('입사 예정자')
     expect(html).toContain('org-project-row')
     expect(html).not.toContain('shared-to-summary')
-    expect(html).not.toContain('공유 TO')
-    expect(html).toContain('입사 예정일')
+    expect(html).toContain('operations-stage-chip')
+    const hireHtml = renderToStaticMarkup(<PipelineOverview openings={data.openings} initialView="hires" />)
+    expect(hireHtml).toContain('id="operations-tab-hires" aria-selected="true"')
+    expect(hireHtml).toContain('입사 예정일')
   })
 })

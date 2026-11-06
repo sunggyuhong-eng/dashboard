@@ -72,7 +72,7 @@ describe('공유 TO', () => {
     expect([...groupOpeningsByProject(data.openings).keys()]).toEqual(['OTPS'])
   })
 
-  it('프로젝트별 카드에 TO와 전형 현황을 직관적으로 표시한다', async () => {
+  it('채용 운영 요약은 프로젝트별 TO 진행과 입사 예정자 화면으로 나눈다', async () => {
     const data = await buildLiveDashboard(payload(), null)
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/오픈 공고<\/span><b>2개/)
@@ -81,7 +81,9 @@ describe('공유 TO', () => {
     expect(html).toContain('PROJECT OVERVIEW')
     expect(html).toContain('프로젝트별 채용 현황')
     expect(html).toContain('채용 운영 요약')
-    expect(html).not.toContain('현재 전형 진행 현황')
+    expect(html).toContain('채용 진행 TO')
+    expect(html).toContain('operations-tab-openings')
+    expect(html).toContain('operations-tab-hires')
     expect(html).toContain('MAZE')
     expect(html).toMatch(/<span class="org-project-stat"><small>목표 TO<\/small><b>3명<\/b><\/span>/)
     expect(html).toContain('org-project-row')
@@ -89,10 +91,11 @@ describe('공유 TO', () => {
     expect(html).not.toContain('project-status-table')
     expect(html).not.toContain('개 공고 합산')
     expect(html).not.toContain('shared-to-row')
-    expect(html).not.toContain('공유 TO')
-    expect(html).toContain('코딩 테스트')
-    expect(html).toContain('오퍼')
-    expect(html).toContain('org-stage-chip')
+    expect(html).toContain('공유 TO')
+    expect(html).toContain('채용 직무')
+    expect(html).toContain('채용 사유')
+    expect(html).toContain('진행 단계')
+    expect(html).toContain('operations-stage-chip')
     expect(html).not.toContain('org-stage-bar')
     const differing = structuredClone(data)
     differing.openings[0].reason = '별도 세부 사유'

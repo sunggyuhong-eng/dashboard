@@ -1,6 +1,6 @@
 채용 대시보드 업데이트 파일입니다.
 
-1. ZIP 안의 `src/` 파일을 GitHub 저장소의 같은 경로에 덮어씁니다. `PipelineOverview.test.tsx`도 새 화면 구조에 맞춘 기존 테스트 변경본이므로 함께 반영합니다.
+1. ZIP 안의 `src/` 파일을 GitHub 저장소의 같은 경로에 덮어씁니다. `PipelineOverview.test.tsx`, `headcount.test.tsx`, `OfferOverview.test.tsx`도 새 화면 구조에 맞춘 기존 테스트 변경본이므로 함께 반영합니다.
 2. `public/` 안의 새 SVG 아이콘 5개를 저장소의 `public/` 폴더에 추가합니다. GDTS·ZERO 이미지는 그대로 사용합니다.
 3. `google-apps-script/Code.gs` 내용을 기존 Apps Script의 `Code.gs` 전체에 덮어씁니다.
 4. Apps Script를 새 버전으로 다시 배포한 다음, 대시보드에서 `데이터 다시 불러오기`를 누릅니다.

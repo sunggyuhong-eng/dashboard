@@ -97,10 +97,13 @@ function dashboard_() {
   var candidateTable = table_(interview, ['진행단계','이름','직무(공고명)']);
   var col = candidateTable.columns;
   var hireDateColumn = firstColumn_(col, ['입사일', '입사 확정 날짜', '입사확정날짜', '입사 확정일', '입사확정일', '입사예정일']);
-  var offerDateColumn = firstColumn_(col, ['오퍼 날짜', '오퍼날짜', 'Offer Date', 'Offer date']);
+  var offerDateColumn = 4; // 채용 단계 시트 E열의 오퍼 날짜
   var firstInterviewColumn = firstColumn_(col, ['1차 면접 날짜', '1차면접날짜', '1차 면접일', '1차면접일', '1차 면접']);
   var secondInterviewColumn = firstColumn_(col, ['2차 면접 날짜', '2차면접날짜', '2차 면접일', '2차면접일', '2차 면접']);
   var timezone = ss.getSpreadsheetTimeZone();
+  var reportNow = new Date();
+  var currentMonday = mondayOfCurrentWeek_(reportNow, timezone);
+  var previousMonday = previousMonday_(reportNow, timezone);
   var candidates = [];
   var hiredCounts = {};
 
@@ -112,18 +115,19 @@ function dashboard_() {
     var title = dashboardOpeningTitle_(row[col['직무(공고명)']]);
     var project = col['PJ'] == null ? '' : clean_(row[col['PJ']]);
     if (!title) continue;
+    var offerDate = dateValue_(rawRow, row, offerDateColumn, timezone);
     var openingKey = key_(project, title);
     if (stage === 'Hired') hiredCounts[openingKey] = (hiredCounts[openingKey] || 0) + 1;
-    if (name && (ACTIVE_STAGES.indexOf(stage) >= 0 || stage === 'Hired')) {
+    if (name && (ACTIVE_STAGES.indexOf(stage) >= 0 || (offerDate >= previousMonday && offerDate < currentMonday))) {
       candidates.push({
         id: 'row-' + (i + 1),
         row: i + 1,
         name: name,
-        stage: stage,
+        stage: ACTIVE_STAGES.indexOf(stage) >= 0 ? stage : 'Hired',
         project: project,
         openingTitle: title,
         hireDate: dateValue_(rawRow, row, hireDateColumn, timezone),
-        offerDate: dateValue_(rawRow, row, offerDateColumn, timezone),
+        offerDate: offerDate,
         firstInterviewDate: dateValue_(rawRow, row, firstInterviewColumn, timezone),
         secondInterviewDate: dateValue_(rawRow, row, secondInterviewColumn, timezone)
       });
@@ -264,6 +268,20 @@ function firstColumn_(columns, names) {
 function dateValue_(rawRow, displayRow, column, timezone) {
   if (column == null) return '';
   return dashboardDate_(rawRow[column], displayRow[column], timezone);
+}
+
+function mondayOfCurrentWeek_(date, timezone) {
+  var parts = Utilities.formatDate(date, timezone, 'yyyy-MM-dd').split('-').map(Number);
+  var utc = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12));
+  var offset = (utc.getUTCDay() + 6) % 7;
+  utc.setUTCDate(utc.getUTCDate() - offset);
+  return Utilities.formatDate(utc, timezone, 'yyyy-MM-dd');
+}
+
+function previousMonday_(date, timezone) {
+  var current = mondayOfCurrentWeek_(date, timezone).split('-').map(Number);
+  var utc = new Date(Date.UTC(current[0], current[1] - 1, current[2] - 7, 12));
+  return Utilities.formatDate(utc, timezone, 'yyyy-MM-dd');
 }
 
 // 실제 날짜 값, 수식의 숫자/문자열 결과를 yyyy-MM-dd로 통일합니다.

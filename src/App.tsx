@@ -42,7 +42,7 @@ function loadNote(opening: Opening): OpeningNote {
 function isNewOpening(opening: Opening) { return opening.isNew === true }
 function stagesFor(opening: Opening, note: OpeningNote) {
   const stages = new Set(note.enabledStages)
-  opening.candidates.forEach(candidate => stages.add(candidate.stage))
+  opening.candidates.forEach(candidate => { if (candidate.stage !== 'Hired') stages.add(candidate.stage) })
   return PIPELINE_STAGES.filter(stage => stages.has(stage))
 }
 

@@ -24,6 +24,18 @@ export type PipelineRow = {
 }
 
 type OperationsView = 'openings' | 'hires'
+type WeekRange = { start: string; endExclusive: string }
+function previousWeekRange(date = new Date()): WeekRange {
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  end.setDate(end.getDate() - ((end.getDay() + 6) % 7))
+  const start = new Date(end)
+  start.setDate(start.getDate() - 7)
+  const format = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  return { start: format(start), endExclusive: format(end) }
+}
+function isInWeekRange(date: string, range: WeekRange) {
+  return !!date && date >= range.start && date < range.endExclusive
+}
 
 const stageLabel: Record<PipelineStage, string> = {
   '온라인 과제': '온라인 과제', '코딩테스트': '코딩 테스트', '역량검사': '역량 검사',
@@ -119,18 +131,19 @@ function OpeningGroups({ openings }: { openings: Opening[] }) {
   </section>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 채용 중인 TO가 없습니다.</b></div>
 }
 
-function PlannedHireList({ openings }: { openings: Opening[] }) {
+function PlannedHireList({ openings, lastWeek }: { openings: Opening[]; lastWeek: WeekRange }) {
   const rows = openings.flatMap(opening => opening.candidates.flatMap(candidate => {
-    const isHired = candidate.stage === 'Hired'
+    const sheetDate = offerDate(candidate.offerDate)
+    const isHired = isInWeekRange(sheetDate, lastWeek)
     if (!isHired && !(opening.status === '진행중' && candidate.stage === 'Offer')) return []
-    const rawDate = isHired ? candidate.offerDate || candidate.hireDate : candidate.hireDate
-    return [{ opening, candidate, isHired, date: offerDate(rawDate) }]
+    const date = isHired ? sheetDate : offerDate(candidate.hireDate)
+    return [{ opening, candidate, isHired, date }]
   })).sort((a, b) => {
     if (a.isHired !== b.isHired) return a.isHired ? -1 : 1
     return a.isHired ? (b.date || '').localeCompare(a.date || '') : (a.date || '9999-12-31').localeCompare(b.date || '9999-12-31')
   })
   return rows.length ? <div className="operations-hires-list">
-    <div className="operations-hires-heading"><b>입사 예정 {rows.filter(row => !row.isHired).length}명</b><span>입사 완료 {rows.filter(row => row.isHired).length}명</span></div>
+    <div className="operations-hires-heading"><b>입사 예정 {rows.filter(row => !row.isHired).length}명</b><span>지난주 입사 {rows.filter(row => row.isHired).length}명</span></div>
     <div className="operations-hire-table-head"><span>프로젝트 · TO</span><span>채용 직무</span><span>채용 사유</span><span>입사자</span><span>상태 · 날짜</span></div>
     {rows.map(({ opening, candidate, isHired, date }) => <article className={`operations-hire-row ${isHired ? 'is-hired' : ''}`} key={`${opening.id}:${candidate.id}`}>
       <div><span className="operations-field-label">프로젝트 · TO</span><strong>{projectName(opening)}{opening.toNumber ? ` · TO ${opening.toNumber}` : opening.toGroup ? ' · 공유 TO' : ''}</strong></div>
@@ -149,7 +162,8 @@ export function PipelineOverview({ openings, initialView = 'openings' }: { openi
   const projectSections = byProject.map(([project, projectOpenings]) => ({ project, openings: projectOpenings, targetTo: totalTargetTo(projectOpenings) }))
   const plannedHireCount = active.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Offer').length, 0)
   const activeToCount = totalTargetTo(active)
-  const hiredCount = openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === 'Hired').length, 0)
+  const lastWeek = previousWeekRange()
+  const hiredCount = openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => isInWeekRange(offerDate(candidate.offerDate), lastWeek)).length, 0)
 
   return <section className="pipeline-overview" aria-label="프로젝트별 채용 운영">
     <div className="operations-view-tabs" role="tablist" aria-label="채용 운영 화면 선택">
@@ -157,14 +171,14 @@ export function PipelineOverview({ openings, initialView = 'openings' }: { openi
         <span>채용 진행 TO</span><b>{activeToCount}명</b>
       </button>
       <button type="button" role="tab" id="operations-tab-hires" aria-selected={view === 'hires'} aria-controls="operations-panel" onClick={() => setView('hires')}>
-        <span>입사 예정자</span><b>{plannedHireCount}명{hiredCount > 0 ? ` · 입사 ${hiredCount}명` : ''}</b>
+        <span>입사 예정자</span><b>{plannedHireCount}명{hiredCount > 0 ? ` · 지난주 입사 ${hiredCount}명` : ''}</b>
       </button>
     </div>
     <div className="operations-panel" id="operations-panel" role="tabpanel" aria-labelledby={view === 'openings' ? 'operations-tab-openings' : 'operations-tab-hires'}>
       {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, targetTo }, index) => <ProjectSection key={project} project={project} countLabel={`채용중 TO ${targetTo}명`} defaultOpen={index === 0}>
         <OpeningGroups openings={projectOpenings} />
       </ProjectSection>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 진행 중인 채용 TO가 없습니다.</b></div>
-      : <PlannedHireList openings={active} />}
+      : <PlannedHireList openings={openings} lastWeek={lastWeek} />}
     </div>
   </section>
 }

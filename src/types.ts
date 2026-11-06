@@ -58,6 +58,7 @@ export type ProjectTable = {
 
 export type DashboardData = {
   openings: Opening[]
+  unmatchedCompletedHires?: Candidate[]
   syncedAt: string
   candidateCount: number
   sheetApiUrl?: string

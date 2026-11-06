@@ -115,10 +115,10 @@ function dashboard_() {
     var project = col['PJ'] == null ? '' : clean_(row[col['PJ']]);
     if (!title) continue;
     var offerDate = dateValue_(rawRow, row, offerDateColumn, timezone);
-    var isPastOfferDate = !!offerDate && offerDate < todayDate;
+    var isPastOfferDate = !!offerDate && offerDate <= todayDate;
     var openingKey = key_(project, title);
     if (stage === 'Hired') hiredCounts[openingKey] = (hiredCounts[openingKey] || 0) + 1;
-    // E열 입사예정일이 오늘보다 이전이면, 진행단계와 무관하게 입사 완료자로 전달합니다.
+    // E열 입사예정일이 오늘 또는 이전이면, 진행단계와 무관하게 입사 완료자로 전달합니다.
     if (name && (ACTIVE_STAGES.indexOf(stage) >= 0 || isPastOfferDate)) {
       candidates.push({
         id: 'row-' + (i + 1),

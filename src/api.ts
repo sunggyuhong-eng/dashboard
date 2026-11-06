@@ -107,8 +107,14 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
   }
   openings.sort((a, b) => `${a.project}\u001f${a.title}`.localeCompare(`${b.project}\u001f${b.title}`, 'ko'))
   groupOpeningsByTo(openings)
+  const matchedOpeningKeys = new Set(openings.map(opening => openingKey(opening.project, opening.title)))
+  const unmatchedCompletedHires = [...candidatesByOpening.entries()]
+    .filter(([key]) => !matchedOpeningKeys.has(key))
+    .flatMap(([, candidates]) => candidates)
+    .filter(candidate => candidate.offerDate)
   return {
     openings,
+    unmatchedCompletedHires,
     candidateCount: openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage !== 'Hired').length, 0),
     syncedAt: payload.syncedAt || new Date().toISOString(),
     sheetApiUrl: previous?.sheetApiUrl || '',

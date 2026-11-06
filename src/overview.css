@@ -426,6 +426,7 @@
 .operations-view-tabs>button[aria-selected="true"] { border: 2px solid #2469c9; background: #f1f7ff; color: #145fc7; box-shadow: 0 1px 3px #145fc71c; }
 .operations-view-tabs>button[aria-selected="true"]>b { color: #145fc7; }
 .operations-panel { min-width: 0; }
+.operations-panel.view-hires, .operations-panel.view-completed { padding: 18px 20px; border: 1px solid #e7eaee; border-radius: 14px; background: #fff; }
 .operations-project-list { display: flex; flex-direction: column; gap: 9px; }
 .operations-project { overflow: hidden; border: 1px solid #e7eaee; border-radius: 14px; background: #fff; }
 .operations-project>summary { display: grid; grid-template-columns: minmax(0, 1fr) 20px; align-items: center; justify-content: start; gap: 12px; min-height: 58px; padding: 13px 16px; color: #202936; cursor: pointer; list-style: none; }
@@ -457,25 +458,23 @@
 .operations-stage-chip>i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #7b8794; }
 .operations-stage-chip>b { color: #111820; font-size: 11px; }
 .operations-no-stage { color: #677381; font-size: 12px; }
-.operations-hires-list { display: flex; flex-direction: column; }
+.operations-hires-list { display: flex; flex-direction: column; background: #fff; }
 .operations-hires-heading { display: flex; align-items: center; gap: 14px; padding: 8px 4px 13px; color: #202936; font-size: 13px; }
 .operations-hires-heading span { color: #647181; }
-.operations-hire-table-head, .operations-hire-row { display: grid; grid-template-columns: minmax(125px, 1fr) minmax(150px, 1.35fr) minmax(155px, 1.5fr) minmax(100px, .8fr) minmax(125px, .9fr); gap: 14px; }
-.operations-hire-table-head { padding: 9px 4px; border-bottom: 1px solid #dfe4ea; color: #687585; font-size: 11px; font-weight: 700; }
-.operations-hire-row { padding: 14px 4px; border-bottom: 1px solid #eef0f2; }
+.operations-hire-table-head, .operations-hire-row { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(90px, .85fr) minmax(150px, 1.35fr) minmax(150px, 1.4fr) minmax(130px, .95fr); gap: 14px; }
+.operations-hire-table-head { padding: 12px 8px; border-bottom: 1px solid #dfe4ea; background: #fff; color: #263241; font-size: 13px; font-weight: 750; }
+.operations-hire-row { align-items: center; padding: 16px 8px; border-bottom: 1px solid #eef0f2; background: #fff; }
 .operations-hire-row:last-child { border-bottom: 0; }
-.operations-hire-row>div { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: #202936; font-size: 12px; line-height: 1.5; }
-.operations-hire-row strong { color: #111820; font-size: 13px; }
+.operations-hire-row>div { min-width: 0; color: #111820; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.operations-hire-row strong { color: #111820; font-size: 14px; font-weight: 650; }
 .operations-hire-date>strong { color: #168348; }
-.operations-hire-row.is-hired { background: #fbfcfd; }
-.operations-hire-row.is-hired .operations-hire-date>strong { color: #354252; }
-.operations-completed-list { display: flex; min-width: 0; flex-direction: column; }
+.operations-completed-list { display: flex; min-width: 0; flex-direction: column; background: #fff; }
 .operations-completed-table-head, .operations-completed-row { display: grid; grid-template-columns: minmax(90px, .8fr) minmax(90px, .85fr) minmax(150px, 1.35fr) minmax(150px, 1.4fr) minmax(130px, .95fr); gap: 14px; }
-.operations-completed-table-head { padding: 9px 4px; border-bottom: 1px solid #dfe4ea; color: #687585; font-size: 11px; font-weight: 700; }
-.operations-completed-row { align-items: center; padding: 14px 4px; border-bottom: 1px solid #eef0f2; }
+.operations-completed-table-head { padding: 12px 8px; border-bottom: 1px solid #dfe4ea; background: #fff; color: #263241; font-size: 13px; font-weight: 750; }
+.operations-completed-row { align-items: center; padding: 16px 8px; border-bottom: 1px solid #eef0f2; background: #fff; }
 .operations-completed-row:last-child { border-bottom: 0; }
-.operations-completed-row>div { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: #202936; font-size: 12px; line-height: 1.5; }
-.operations-completed-row strong { color: #111820; font-size: 13px; }
+.operations-completed-row>div { min-width: 0; color: #111820; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.operations-completed-row strong { color: #111820; font-size: 14px; font-weight: 650; }
 .operations-completed-date>strong { color: #4d5967; }
 .operations-empty { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #929daa; }
 .operations-empty>b { color: #5f6b78; font-size: 13px; }
@@ -484,10 +483,8 @@
 .org-project-row .org-project-stat { grid-column: 2; }
 @media (max-width: 850px) {
   .operations-opening { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .operations-hire-table-head { display: none; }
-  .operations-hire-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .operations-completed-table-head { display: none; }
-  .operations-completed-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operations-panel.view-hires, .operations-panel.view-completed { overflow-x: auto; }
+  .operations-hire-table-head, .operations-hire-row, .operations-completed-table-head, .operations-completed-row { min-width: 760px; }
 }
 @media (max-width: 560px) {
   .operations-view-tabs { gap: 6px; }
@@ -498,9 +495,7 @@
   .operations-project-content { padding: 0 8px 9px; }
   .operations-to-group>header { padding-right: 9px; padding-left: 9px; }
   .operations-opening { padding: 12px 9px; }
-  .operations-hire-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .operations-completed-list { padding: 0 4px; }
-  .operations-completed-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .operations-panel.view-hires, .operations-panel.view-completed { padding: 12px; }
   .org-project-row, .org-project-row.has-project-total { grid-template-columns: minmax(0, 1fr) 18px; }
   .org-project-row .org-project-stat { grid-column: 1; }
   .org-project-row.has-project-total>svg, .org-project-row>svg { grid-column: 2; grid-row: 1; }

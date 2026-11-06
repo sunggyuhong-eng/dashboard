@@ -289,40 +289,12 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
     const bi = projectOrder.indexOf(key(b))
     return (ai < 0 ? projectOrder.length : ai) - (bi < 0 ? projectOrder.length : bi) || a.localeCompare(b, 'ko')
   })
-  const selectedProjectOpenings = selectedProject ? allProjects.get(selectedProject) || [] : []
-  const selectedActiveOpenings = selectedProjectOpenings.filter(opening => opening.status === '진행중')
-  const currentToGroups = groupOpeningsByTo(selectedActiveOpenings)
   const openReport = () => setReportOpen(true)
-
-  const renderToGroup = (group: ReturnType<typeof groupOpeningsByTo>[number]) => {
-    return <article className="org-to-group" key={`active-${group.key}`}>
-      <header className="org-to-metrics"><div className="org-to-metrics-main"><span className="org-status">진행 중</span><span>목표 TO <b>{group.targetTo}명</b></span></div></header>
-      <ul className="org-to-openings">{group.openings.map(opening => {
-        const stages = PIPELINE_STAGES.filter(stage => opening.candidates.some(candidate => candidate.stage === stage))
-        const offerCandidates = opening.candidates.filter(candidate => candidate.stage === 'Offer')
-        return <li key={opening.id}>
-          <div className="org-to-opening-title"><div className="org-to-opening-name"><b>{roleName(opening, selectedProject || opening.project)}</b>{opening.targetTo > 0 && <span className="org-opening-target-badge">목표 TO {opening.targetTo}명</span>}</div><p className="org-to-reason"><span className="org-to-reason-heading"><strong>채용 사유</strong></span><span>{opening.reason || '채용 사유 미입력'}</span></p></div>
-          <div className="org-to-opening-progress"><div className="org-stage-breakdown">{stages.length ? stages.map(stage => { const count = opening.candidates.filter(candidate => candidate.stage === stage).length; return <span key={stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(stage)}`} /><span>{stageLabel(stage)}</span><b>{count}명</b></span> }) : <span className="org-stage-none">현재 진행 지원자 없음</span>}</div>{offerCandidates.length > 0 && <div className="org-to-hire-dates" aria-label="입사 예정"><strong>입사 예정</strong>{offerCandidates.map(candidate => <span key={candidate.id}><b>{candidate.name}</b><time>{candidate.hireDate ? formatKoreanDate(candidate.hireDate) : '예정일 미입력'}</time></span>)}</div>}</div>
-          {opening.approvalUrl && <a className="org-opening-link" href={opening.approvalUrl} target="_blank" rel="noreferrer">채용승인신청서 링크 <ChevronRight size={14} /></a>}
-        </li>
-      })}</ul>
-    </article>
-  }
-
-  const projectCategories = (table: NonNullable<DashboardData['projectTables']>[string]) => {
-    const assigned = new Set<number>()
-    return table.rows.map((row, rowIndex) => {
-      const ids = [...new Set(row.slots.flatMap(slot => slot.toNumbers?.length ? slot.toNumbers : slot.toNumber ? [slot.toNumber] : []))]
-      ids.forEach(id => assigned.add(id))
-      const openings = selectedActiveOpenings.filter(opening => opening.toNumber != null && ids.includes(opening.toNumber))
-      return openings.length ? <section className="maze-category" key={`${row.part}-${rowIndex}`}><header className="maze-category-heading"><h5>{row.part}</h5></header>{groupOpeningsByTo(openings).map(renderToGroup)}</section> : null
-    }).concat(selectedActiveOpenings.filter(opening => opening.toNumber == null || !assigned.has(opening.toNumber)).length ? [<section className="maze-category" key="maze-unassigned"><header className="maze-category-heading"><h5>파트 미지정</h5></header>{groupOpeningsByTo(selectedActiveOpenings.filter(opening => opening.toNumber == null || !assigned.has(opening.toNumber))).map(renderToGroup)}</section>] : [])
-  }
 
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>전체 채용 현황</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="오픈 공고" value={`${active.length}개`} /><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /></div>
-    <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>채용 운영 요약</h2></div></header><PipelineOverview openings={active} onSelectOpening={onSelectOpening} /></section>
-    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 해당 프로젝트의 전체 TO와 진행 중인 채용을 확인할 수 있어요.</p></div></header>
+    <section className="recruiting-operations"><header><div><span>RECRUITING OPERATIONS</span><h2>프로젝트별 TO 진행 현황</h2></div></header><PipelineOverview openings={active} /></section>
+    <article className="project-overview"><header><div><span>PROJECT OVERVIEW</span><h2>프로젝트별 채용 현황</h2><p>프로젝트를 선택하면 전체 TO와 구성원 상태를 확인할 수 있어요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
         const activeProjectTarget = totalTargetTo(activeOpenings)
@@ -334,18 +306,16 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         const projectTable = data.projectTables?.[projectKey]
         const projectTableName: Record<string, string> = { MAZE: 'TO_MAZE', ZERO: 'TO_ZERO', OTPS: 'TO_OTPS', HERO: 'TO_HERO', GDTS: 'TO_GDTS', 'ART실': 'TO_Art실' }
         const projectSheetName = projectTableName[projectKey] || `TO_${projectKey}`
-        const stageCounts = PIPELINE_STAGES.map(stage => ({ stage, count: activeOpenings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage === stage).length, 0) })).filter(item => item.count)
         const iconFiles: Record<string, string> = { 'ART실': 'art-photoshop.svg', ART: 'art-photoshop.svg', GDTS: 'gdts.png', OTPS: 'new-project.svg', MAZE: 'new-project.svg', HERO: 'new-project.svg', ZERO: 'zero.png', QA: 'qa-tools.svg', SERVER: 'server-wifi.svg', KONG: 'kong-person.svg' }
         const icon = iconFiles[projectKey]
         return <div className="org-project-entry" key={project}>
           <button type="button" className={`org-project-row ${showHeadcountChips ? 'has-project-total' : ''} ${selectedProject === project ? 'active' : ''}`} aria-expanded={selectedProject === project} onClick={() => setSelectedProject(selectedProject === project ? null : project)}>
               <span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" /> }<span><strong>{project}</strong>{showHeadcountChips && <span className="org-project-headcount">{projectTotal != null && <span>전체 TO <b>{projectTotal}명</b></span>}<span>채용중 TO <b>{activeProjectTarget}명</b></span></span>}</span></span>
             {projectTotal == null && !showActiveOnlyHeadcount && <span className="org-project-stat"><small>목표 TO</small><b>{totalTargetTo(projectOpenings)}명</b></span>}
-            <span className="org-project-stages">{stageCounts.length ? stageCounts.map(item => <span key={item.stage} className="org-stage-chip"><i className={`org-stage-dot-${stageClass(item.stage)}`} /><span>{stageLabel(item.stage)}</span><b>{item.count}명</b></span>) : <small>진행 중 지원자 없음</small>}</span><ChevronRight size={17} />
+            <ChevronRight size={17} />
           </button>
           {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
             {projectTable && <section className="maze-to-overview"><header><div><span>{projectSheetName} HEADCOUNT</span><h4>TO 현황</h4></div><div className="maze-to-metrics"><span><small>전체 TO</small><b>{projectTable.totalTo}명</b></span><span><small>채용중 TO</small><b>{activeProjectTarget}명</b></span></div></header><h5>{projectSheetName} 파트별 현황</h5><div className="maze-to-table-scroll"><table aria-label={`${projectKey} TO 현황`}><thead><tr><th scope="col">파트</th><th scope="col">인원</th><th scope="col">구성원 · TO 상태</th></tr></thead><tbody>{projectTable.rows.map((row, rowIndex) => { const displaySlots = displayProjectSlots(row.slots); return <tr key={`${row.part}-${rowIndex}`}><th scope="row">{row.part}</th><td>{row.count}명</td><td>{displaySlots.length ? <div className="maze-member-list">{displaySlots.map((slot, slotIndex) => slot.person?.includes('입사예정') ? <span className="maze-planned-hire" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('대체채용 진행중') ? <span className="maze-planned-replacement" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('퇴사예정') ? <span className="maze-planned-departure" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('휴직') ? <span className="maze-member maze-member-leave" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : (slot.toNumber || slot.toNumbers?.length) ? <span className={`maze-to-status ${slot.status === '완료' ? 'done' : ''}`} key={`${slot.toNumber ?? slot.toNumbers?.join('&')}-${slotIndex}`}>{slot.status === '완료' ? '완료' : '채용중'}</span> : slot.person ? <span className="maze-member" key={slotIndex}>{slot.person}</span> : null)}</div> : <span className="maze-member-empty">—</span>}</td></tr> })}</tbody></table></div></section>}
-            <section className="org-to-section"><header><div><h4>현재 진행 중 TO</h4><small>(채용중 TO {activeProjectTarget}명)</small></div></header>{projectTable ? projectCategories(projectTable) : currentToGroups.length ? currentToGroups.map(renderToGroup) : <p className="org-history-empty">현재 진행 중인 TO가 없습니다.</p>}</section>
           </section>}
         </div>
       })}</div>

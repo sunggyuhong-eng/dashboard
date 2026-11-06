@@ -76,4 +76,17 @@ describe('전형별 지원자 목록', () => {
     const emptyHires = renderToStaticMarkup(<PipelineOverview openings={[]} initialView="hires" />)
     expect(emptyHires).toContain('현재 입사 예정자가 없습니다.')
   })
+
+  it('입사 완료자는 같은 입사날짜로 묶고 최근 날짜부터 표시한다', () => {
+    const html = renderToStaticMarkup(<PipelineOverview openings={[]} initialView="completed" completedHires={[
+      { name: '김가', organization: 'MAZE', team: '개발', title: '엔지니어', employmentType: '정규직', hireDate: '2026-10-26' },
+      { name: '박나', organization: 'HERO', team: '기획', title: '기획자', employmentType: '정규직', hireDate: '2026-11-02' },
+      { name: '이다', organization: 'ZERO', team: '아트', title: '아티스트', employmentType: '계약직', hireDate: '2026-11-02' },
+    ]} />)
+    expect(html.match(/class="operations-completed-date-group"/g)).toHaveLength(2)
+    expect(html.indexOf('2026.11.02')).toBeLessThan(html.indexOf('2026.10.26'))
+    expect(html.indexOf('박나')).toBeLessThan(html.indexOf('2026.10.26'))
+    expect(html.indexOf('이다')).toBeLessThan(html.indexOf('2026.10.26'))
+    expect(html.match(/2026\.11\.02/g)).toHaveLength(1)
+  })
 })

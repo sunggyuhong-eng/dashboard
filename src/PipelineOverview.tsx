@@ -89,14 +89,21 @@ function sortProjectEntries<T>(entries: [string, T][]) {
   })
 }
 
+function projectIcon(project: string) {
+  const key = project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
+  const icons: Record<string, string> = { 'ART실': 'art-photoshop.svg', ART: 'art-photoshop.svg', GDTS: 'gdts.png', OTPS: 'new-project.svg', MAZE: 'new-project.svg', HERO: 'new-project.svg', ZERO: 'zero.png', QA: 'qa-tools.svg', SERVER: 'server-wifi.svg', KONG: 'kong-person.svg' }
+  return icons[key]
+}
+
 function ProjectSection({ project, countLabel, children, defaultOpen = false }: {
   project: string
   countLabel?: string
   children: ReactNode
   defaultOpen?: boolean
 }) {
-  return <details className={`operations-project ${countLabel ? 'has-count' : ''}`} open={defaultOpen}>
-    <summary>{countLabel && <span className="operations-project-count">{countLabel}</span>}<strong>{project}</strong><ChevronDown size={18} aria-hidden="true" /></summary>
+  const icon = projectIcon(project)
+  return <details className="operations-project" open={defaultOpen}>
+    <summary><span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" />}<span><strong>{project}</strong>{countLabel && <span className="org-project-headcount"><span>채용중 TO <b>{countLabel}</b></span></span>}</span></span><ChevronDown size={18} aria-hidden="true" /></summary>
     <div className="operations-project-content">{children}</div>
   </details>
 }
@@ -150,19 +157,25 @@ function PlannedHireList({ openings }: { openings: Opening[] }) {
 }
 
 function CompletedToList({ completedHires }: { completedHires: CompletedHire[] }) {
-  const rows = [...completedHires].sort((a, b) => (offerDate(b.hireDate) || '').localeCompare(offerDate(a.hireDate) || '')
-    || a.name.localeCompare(b.name, 'ko'))
-  return rows.length ? <div className="operations-completed-list">
-    <div className="operations-hires-heading"><b>입사 완료 {rows.length}명</b></div>
-    <div className="operations-completed-table-head"><span>이름</span><span>소속</span><span>팀</span><span>Title</span><span>계약형태</span><span>입사날짜</span></div>
-    {rows.map((hire, index) => <article className="operations-completed-row" key={`${hire.name}:${hire.hireDate}:${index}`}>
-      <div><strong>{hire.name}</strong></div>
-      <div><strong>{hire.organization || '—'}</strong></div>
-      <div><span>{hire.team || '—'}</span></div>
-      <div><strong>{hire.title || '—'}</strong></div>
-      <div><span>{hire.employmentType || '—'}</span></div>
-      <div className="operations-completed-date"><strong>{offerDate(hire.hireDate).replace(/-/g, '.') || '날짜 미입력'}</strong></div>
-    </article>)}
+  const byDate = new Map<string, CompletedHire[]>()
+  completedHires.forEach(hire => {
+    const date = offerDate(hire.hireDate)
+    byDate.set(date, [...(byDate.get(date) || []), hire])
+  })
+  const groups = [...byDate.entries()].sort(([a], [b]) => (b || '').localeCompare(a || ''))
+  return completedHires.length ? <div className="operations-completed-list">
+    <div className="operations-hires-heading"><b>입사 완료 {completedHires.length}명</b></div>
+    {groups.map(([date, hires]) => <section className="operations-completed-date-group" key={date || 'undated'}>
+      <header><strong>{date ? date.replace(/-/g, '.') : '입사날짜 미입력'}</strong><span>{hires.length}명</span></header>
+      <div className="operations-completed-table-head"><span>이름</span><span>소속</span><span>팀</span><span>Title</span><span>계약형태</span></div>
+      {hires.sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((hire, index) => <article className="operations-completed-row" key={`${hire.name}:${date}:${index}`}>
+        <div><strong>{hire.name}</strong></div>
+        <div><strong>{hire.organization || '—'}</strong></div>
+        <div><span>{hire.team || '—'}</span></div>
+        <div><strong>{hire.title || '—'}</strong></div>
+        <div><span>{hire.employmentType || '—'}</span></div>
+      </article>)}
+    </section>)}
   </div> : <div className="operations-empty"><CalendarDays size={23} /><b>입사 완료자가 없습니다.</b></div>
 }
 
@@ -193,7 +206,7 @@ export function PipelineOverview({ openings, completedHires = [], initialView = 
       </button>
     </div>
     <div className={`operations-panel view-${view}`} id="operations-panel" role="tabpanel" aria-labelledby={`operations-tab-${view}`}>
-      {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, targetTo }, index) => <ProjectSection key={project} project={project} countLabel={`채용중 TO ${targetTo}명`} defaultOpen={index === 0}>
+      {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, targetTo }, index) => <ProjectSection key={project} project={project} countLabel={`${targetTo}명`} defaultOpen={index === 0}>
         <OpeningGroups openings={projectOpenings} />
       </ProjectSection>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 진행 중인 채용 TO가 없습니다.</b></div>
       : view === 'hires' ? <PlannedHireList openings={openings} /> : <CompletedToList completedHires={completedHires} />}

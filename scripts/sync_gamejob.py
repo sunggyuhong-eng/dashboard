@@ -109,9 +109,12 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
             "status": opening_status(source.get("status")),
             "project": project,
             "targetTo": max(0, int(float(source.get("targetTo") or 0))),
+            "toNumber": max(0, int(float(source.get("toNumber") or 0))),
             "toGroup": " ".join(str(source.get("toGroup") or "").split()),
             "hiredCount": int(hired_counts.get(key, 0) or 0),
             "reason": str(source.get("reason") or "").strip(),
+            "completedName": str(source.get("completedName") or "").strip(),
+            "completedDate": str(source.get("completedDate") or "").strip(),
             "approvalUrl": approval_link(source.get("approvalUrl")),
             "candidates": candidates,
         })

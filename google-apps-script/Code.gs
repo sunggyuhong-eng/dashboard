@@ -73,6 +73,7 @@ function dashboard_() {
       });
     });
   });
+  var timezone = ss.getSpreadsheetTimeZone();
   var openings = [];
   for (var o = openingTable.headerRow; o < openingTable.values.length; o++) {
     var openingRow = openingTable.values[o];
@@ -90,6 +91,8 @@ function dashboard_() {
       toNumber: openingToNumber,
       toGroup: sharedToGroup || (openingTable.columns.toGroup == null ? '' : clean_(openingRow[openingTable.columns.toGroup]).replace(/\s+/g, ' ')),
       reason: clean_(openingRow[openingTable.columns.reason]),
+      completedName: openingTable.columns.completedName == null ? '' : clean_(openingRow[openingTable.columns.completedName]),
+      completedDate: dateValue_(openingTable.rawValues[o] || [], openingRow, openingTable.columns.completedDate, timezone),
       approvalUrl: openingTable.approvalLinks[o] || ''
     });
   }
@@ -100,7 +103,6 @@ function dashboard_() {
   var offerDateColumn = 4; // 채용 단계 시트 E열의 오퍼 날짜
   var firstInterviewColumn = firstColumn_(col, ['1차 면접 날짜', '1차면접날짜', '1차 면접일', '1차면접일', '1차 면접']);
   var secondInterviewColumn = firstColumn_(col, ['2차 면접 날짜', '2차면접날짜', '2차 면접일', '2차면접일', '2차 면접']);
-  var timezone = ss.getSpreadsheetTimeZone();
   var reportNow = new Date();
   var todayDate = Utilities.formatDate(reportNow, timezone, 'yyyy-MM-dd');
   var candidates = [];
@@ -197,7 +199,9 @@ function mazeTable_(sheet, openingTable) {
 }
 
 function openingTable_(sheet) {
-  var values = sheet.getDataRange().getDisplayValues();
+  var range = sheet.getDataRange();
+  var values = range.getDisplayValues();
+  var rawValues = range.getValues();
   var aliases = {
     project: ['프로젝트', '프로젝트명', '프로젝트 명', '프로젝트 이름', 'PJ'],
     title: ['공고명', '공고 이름', '직무(공고명)'],
@@ -206,6 +210,8 @@ function openingTable_(sheet) {
     toNumber: ['TO번호', 'TO 번호', 'TO ID'],
     toGroup: ['TO 그룹', 'TO그룹', '공유 TO 그룹', '공유TO그룹'],
     reason: ['채용사유', '채용 사유', '채용배경', '채용 배경'],
+    completedName: ['채용완료', '입사완료', '입사자', '입사완료자'],
+    completedDate: ['입사날짜', '입사 날짜', '입사일', '입사완료일'],
     approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서']
   };
   for (var r = 0; r < Math.min(values.length, 40); r++) {
@@ -229,7 +235,7 @@ function openingTable_(sheet) {
           );
         }
       }
-      return { values: values, headerRow: r + 1, columns: columns, approvalLinks: approvalLinks };
+      return { values: values, rawValues: rawValues, headerRow: r + 1, columns: columns, approvalLinks: approvalLinks };
     }
   }
   throw new Error(sheet.getName() + ' 시트에서 프로젝트, 공고명, 채용인원, 채용사유 헤더를 찾지 못했습니다.');

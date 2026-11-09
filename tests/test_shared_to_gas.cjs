@@ -45,11 +45,11 @@ function read(openingValues) {
   vm.runInContext(code, context)
   return JSON.parse(JSON.stringify(vm.runInContext('dashboard_()', context)))
 }
-const headers = ['프로젝트', '공고명', '채용인원', '채용사유', '채용승인신청서 링크', 'TO 그룹', '상태']
+const headers = ['프로젝트', '공고명', '채용인원', '채용사유', '채용승인신청서 링크', 'TO 그룹', '상태', 'TO번호', '채용완료', '입사날짜']
 const data = read([
   headers,
   ['MAZE', '[MAZE] 소프트웨어 엔지니어', '3', '대체채용', 'https://example.com/one', ' MAZE-개발-01 ', '진행중'],
-  ['MAZE', '[MAZE] 그래픽스 프로그래머', '3', '대체채용', 'https://example.com/two', 'MAZE-개발-01', '완료'],
+  ['MAZE', '[MAZE] 그래픽스 프로그래머', '3', '대체채용', 'https://example.com/two', 'MAZE-개발-01', '완료', '15', '테스트 입사자', '2026-11-09'],
 ])
 assert.equal(data.openings.length, 2)
 assert.equal(data.candidates.length, 2)
@@ -58,6 +58,9 @@ assert.deepEqual(data.openings.map(row => row.targetTo), [3, 3])
 assert.deepEqual(data.openings.map(row => row.status), ['진행중', '완료'])
 assert.deepEqual(data.openings.map(row => row.title), ['소프트웨어 엔지니어', '그래픽스 프로그래머'])
 assert.equal(data.openings[1].approvalUrl, 'https://example.com/two')
+assert.equal(data.openings[1].toNumber, 15)
+assert.equal(data.openings[1].completedName, '테스트 입사자')
+assert.equal(data.openings[1].completedDate, '2026-11-09')
 assert.equal(data.candidates[0].firstInterviewDate, '2026-11-19')
 assert.equal(data.candidates[1].hireDate, '2026-12-01')
 assert.equal(Object.hasOwn(data, 'applications'), false)

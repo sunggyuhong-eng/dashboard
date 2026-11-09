@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowLeft, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
+import { CompletedToOverview } from './CompletedToOverview'
 import { collectPlannedHires, PipelineOverview, ProjectOpeningProgress } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
@@ -320,6 +321,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
         </div>
       })}</div>
     </article>
+    <CompletedToOverview openings={data.openings} />
     {reportOpen && <RecruitingReport data={data} openingNotes={new Map(active.map(opening => [opening.id, notes.get(opening.id)?.memo || '']))} onClose={() => setReportOpen(false)} />}
   </section>
 }

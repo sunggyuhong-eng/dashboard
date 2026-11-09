@@ -32,6 +32,8 @@ export type Opening = {
   toGroup?: string
   hiredCount: number
   reason: string
+  completedName?: string
+  completedDate?: string
   approvalUrl?: string
   source: 'sheet'
   isNew: boolean

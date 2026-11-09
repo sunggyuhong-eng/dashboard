@@ -151,3 +151,12 @@ def test_dashboard_exports_g_column_status_and_normalizes_online_assignment():
     assert by_title["Client Engineer"]["status"] == "완료"
     assert by_title["Client Engineer"]["candidates"][0]["stage"] == "온라인 과제"
     assert by_title["UI Artist"]["status"] == "진행중"
+
+
+def test_dashboard_exports_completed_person_date_and_to_number():
+    data = {"openings": [{"project": "KONG", "title": "글로벌 사업PM", "status": "완료",
+                         "targetTo": 1, "toNumber": 15, "completedName": "테스트 입사자",
+                         "completedDate": "2026-11-09"}], "candidates": []}
+    dashboard, _ = build_dashboard(data)
+    opening = dashboard["openings"][0]
+    assert (opening["toNumber"], opening["completedName"], opening["completedDate"]) == (15, "테스트 입사자", "2026-11-09")

@@ -10,6 +10,7 @@ export default mergeConfig(viteConfig, defineConfig({
       'src/headcount.test.tsx',
       'src/OfferOverview.test.tsx',
       'src/PipelineOverview.test.tsx',
+      'src/CompletedToOverview.test.tsx',
       'src/RecruitingReport.test.tsx',
       'src/opening-history.test.ts',
       'src/api-status.test.ts',

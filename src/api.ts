@@ -2,7 +2,7 @@ import { type Candidate, type CandidateStage, type DashboardData, type Opening, 
 import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
-type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown; status?: unknown; toNumber?: unknown }
+type SheetOpening = { project?: unknown; title?: unknown; targetTo?: unknown; toGroup?: unknown; reason?: unknown; approvalUrl?: unknown; status?: unknown; toNumber?: unknown; completedName?: unknown; completedDate?: unknown }
 type SheetCandidate = { id?: unknown; row?: unknown; name?: unknown; stage?: unknown; project?: unknown; openingTitle?: unknown; hireDate?: unknown; offerDate?: unknown; firstInterviewDate?: unknown; secondInterviewDate?: unknown }
 type SheetPayload = {
   ok?: boolean
@@ -100,6 +100,8 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
       toGroup: clean(source.toGroup).replace(/\s+/g, ' '),
       hiredCount: Math.max(0, Number(payload.hiredCounts?.[key]) || 0),
       reason: clean(source.reason),
+      completedName: clean(source.completedName),
+      completedDate: clean(source.completedDate),
       approvalUrl: approvalLink(source.approvalUrl),
       isNew: previous !== null && !previousIds.has(id),
       candidates: candidatesByOpening.get(key) || [],

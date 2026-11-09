@@ -1,4 +1,4 @@
-import type { Opening } from './types'
+import type { Opening, ProjectTableSlot } from './types'
 
 const normalized = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase()
 
@@ -60,4 +60,30 @@ export function groupOpeningsByTo(openings: Opening[]): ToGroup[] {
 
 export function totalTargetTo(openings: Opening[]): number {
   return groupOpeningsByTo(openings).reduce((sum, group) => sum + group.targetTo, 0)
+}
+
+export function toProgressAnchor(group: ToGroup): string {
+  return `to-progress-${group.openings[0].id}`
+}
+
+export function activeToTargets(openings: Opening[]): Map<number, string | null> {
+  const targets = new Map<number, string | null>()
+  groupOpeningsByTo(openings.filter(opening => opening.status === '진행중')).forEach(group => {
+    const anchor = toProgressAnchor(group)
+    group.openings.forEach(opening => {
+      const number = opening.toNumber
+      if (!number) return
+      if (targets.has(number) && targets.get(number) !== anchor) targets.set(number, null)
+      else if (!targets.has(number)) targets.set(number, anchor)
+    })
+  })
+  return targets
+}
+
+export function targetForProjectSlot(slot: ProjectTableSlot, targets: Map<number, string | null>): string | null {
+  const numbers = slot.toNumbers?.length ? slot.toNumbers : slot.toNumber ? [slot.toNumber] : []
+  if (!numbers.length) return null
+  const destinations = numbers.map(number => targets.get(number))
+  const active = [...new Set(destinations.filter((destination): destination is string => typeof destination === 'string'))]
+  return destinations.includes(null) || active.length !== 1 ? null : active[0]
 }

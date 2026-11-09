@@ -3,7 +3,6 @@ import { ArrowLeft, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, Chevron
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
 import { CompletedToOverview } from './CompletedToOverview'
-import { WeeklyComparison } from './WeeklyComparison'
 import { collectPlannedHires, PipelineOverview, ProjectOpeningProgress } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { activeToTargets, groupOpeningsByProject, groupOpeningsByTo, projectName, targetForProjectSlot, totalTargetTo } from './headcount'
@@ -315,7 +314,6 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
 
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>전체 채용 현황</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /><Summary label="오픈 공고" value={`${active.length}개`} /></div>
-    <WeeklyComparison data={data} />
     <section className="recruiting-operations"><header><div><h2>채용 단계별 진행 지원자</h2><p className="section-description">과제·테스트, 면접, 처우, 입사 예정 순으로 확인하세요.</p></div></header><PipelineOverview openings={data.openings} /></section>
     <article className="project-overview"><header><div><h2>프로젝트 TO 현황</h2><p>프로젝트를 펼쳐 TO 구성과 채용 진행 상황을 함께 확인하세요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {

@@ -517,6 +517,8 @@
 .weekly-difference small { margin-left: 5px; color: #4e5968; font-size: 12px; font-weight: 500; }
 .weekly-difference.up { color: #145fc7; }.weekly-difference.down { color: #c62828; }
 .weekly-no-previous { color: #596575; }
+.weekly-previous-completed { color: #333d4b; font-size: 14px; font-weight: 600; }
+.weekly-previous-completed b { color: #145fc7; }
 .weekly-baseline, .weekly-error { margin: 16px 0 0; padding: 14px 16px; border-radius: 10px; background: #fff; color: #333d4b; font-size: 14px; }
 .weekly-error { color: #a32727; }
 .weekly-projects { margin-top: 18px; padding: 18px 20px 8px; border-radius: 15px; background: #fff; }

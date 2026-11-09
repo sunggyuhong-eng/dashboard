@@ -46,16 +46,21 @@ export function liveWeeklyRows(openings: Opening[], week: string): WeeklySnapsho
 }
 
 export function weeklyComparison(data: DashboardData, now = new Date()) {
-  const currentMonday = mondayInSeoul(now)
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
-  const snapshots = data.weeklySnapshots || []
-  const storedWeeks = [...new Set(snapshots.map(row => row.week).filter(week => week <= currentMonday))].sort().reverse()
-  const week = today === currentMonday ? currentMonday : storedWeeks[0] || currentMonday
-  const current = today === currentMonday || !storedWeeks.includes(week)
-    ? liveWeeklyRows(data.openings, week) : snapshots.filter(row => row.week === week)
+  const week = mondayInSeoul(now)
   const previousWeek = shiftWeek(week, -7)
-  const previous = snapshots.filter(row => row.week === previousWeek)
-  return { week, previousWeek, current, previous, hasPrevious: previous.some(row => row.project === '전체') }
+  const snapshots = data.weeklySnapshots || []
+  // TO/지원자의 직전 월요일 값만 보관 기록을 사용합니다. I/J열에 뒤늦게
+  // 적은 완료자는 최신 시트에서 날짜별로 다시 계산해야 새로고침 즉시 반영됩니다.
+  const current = liveWeeklyRows(data.openings, week)
+  const previousCompletions = liveWeeklyRows(data.openings, previousWeek)
+  const previousSnapshot = snapshots.filter(row => row.week === previousWeek)
+  const completedByProject = new Map(previousCompletions.map(row => [row.project, row.completed]))
+  const previous = [...previousSnapshot.map(row => ({ ...row, completed: completedByProject.get(row.project) ?? 0 }))]
+  const recorded = new Set(previous.map(row => row.project))
+  previousCompletions.forEach(row => {
+    if (!recorded.has(row.project)) previous.push({ ...row, activeTo: 0, candidates: 0 })
+  })
+  return { week, previousWeek, current, previous, hasPrevious: previousSnapshot.some(row => row.project === '전체') }
 }
 
 function Difference({ current, previous, hasPrevious }: { current: number; previous: number; hasPrevious: boolean }) {
@@ -78,15 +83,17 @@ export function WeeklyComparison({ data, now }: { data: DashboardData; now?: Dat
     {data.weeklySnapshotError && <p className="weekly-error">주간 기록을 저장하지 못했습니다: {data.weeklySnapshotError}</p>}
     <div className="weekly-metrics">
       {([['채용중 TO', 'activeTo'], ['진행 지원자', 'candidates'], ['주간 채용 완료', 'completed']] as const).map(([label, field]) =>
-        <article key={field}><span>{label}</span><strong>{total[field]}명</strong><Difference current={total[field]} previous={old[field]} hasPrevious={hasPrevious} /></article>)}
+        <article key={field}><span>{label}</span><strong>{total[field]}명</strong>{field === 'completed'
+          ? <span className="weekly-previous-completed">지난 월요일 채용 완료 <b>{old.completed}명</b></span>
+          : <Difference current={total[field]} previous={old[field]} hasPrevious={hasPrevious} />}</article>)}
     </div>
     {hasPrevious ? <div className="weekly-projects"><h3>프로젝트별 변화</h3><div className="weekly-project-head"><span>프로젝트</span><span>채용중 TO</span><span>진행 지원자</span><span>주간 채용 완료</span></div>
       {projectNames.map(project => {
         const row = currentByProject.get(project)
         const prior = oldByProject.get(project)
         return <div className="weekly-project-row" key={project}><strong>{displayProject(project)}</strong>
-          {(['activeTo', 'candidates', 'completed'] as const).map(field => <span key={field}>{prior?.[field] ?? 0} → <b>{row?.[field] ?? 0}</b></span>)}
+          {(['activeTo', 'candidates', 'completed'] as const).map(field => <span key={field}>{field === 'completed' || hasPrevious ? prior?.[field] ?? 0 : '—'} → <b>{row?.[field] ?? 0}</b></span>)}
         </div>
-      })}</div> : <p className="weekly-baseline">첫 월요일 기록을 기준으로 저장합니다. 직전 월요일 기록이 쌓이면 증감이 표시됩니다.</p>}
+      })}</div> : <p className="weekly-baseline">지난 월요일 TO·지원자 기록이 없어 두 지표의 증감은 아직 표시할 수 없습니다. 완료 인원은 입력한 공고 마감 날짜를 기준으로 즉시 집계합니다.</p>}
   </section>
 }

@@ -1,8 +1,7 @@
-import { useState, type ReactNode } from 'react'
-import { CalendarDays, ChevronDown, UsersRound } from 'lucide-react'
-import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
+import { CalendarDays, UsersRound } from 'lucide-react'
+import { groupOpeningsByTo, projectName } from './headcount'
 import { offerDate } from './OfferOverview'
-import type { Candidate, CompletedHire, Opening, PipelineStage } from './types'
+import type { Candidate, Opening, PipelineStage } from './types'
 
 export const PIPELINE_GROUPS = [
   { id: 'task', label: '온라인 과제', stages: ['온라인 과제'] },
@@ -23,14 +22,8 @@ export type PipelineRow = {
   dates: { label: string; value: string }[]
 }
 
-type OperationsView = 'openings' | 'hires' | 'completed'
 function todayDateString(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-function thisWeekMonday(date = new Date()) {
-  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
-  return todayDateString(monday)
 }
 
 export function collectPlannedHires(openings: Opening[], today = todayDateString()) {
@@ -89,35 +82,6 @@ function roleName(opening: Opening) {
     .trim() || opening.title
 }
 
-function sortProjectEntries<T>(entries: [string, T][]) {
-  const order = ['ART실', 'GDTS', 'OTPS', 'MAZE', 'HERO', 'ZERO', 'QA', 'SERVER', 'KONG']
-  return [...entries].sort(([a], [b]) => {
-    const key = (value: string) => value.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
-    const ai = order.indexOf(key(a))
-    const bi = order.indexOf(key(b))
-    return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b, 'ko')
-  })
-}
-
-function projectIcon(project: string) {
-  const key = project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
-  const icons: Record<string, string> = { 'ART실': 'art-photoshop.svg', ART: 'art-photoshop.svg', GDTS: 'gdts.png', OTPS: 'new-project.svg', MAZE: 'new-project.svg', HERO: 'new-project.svg', ZERO: 'zero.png', QA: 'qa-tools.svg', SERVER: 'server-wifi.svg', KONG: 'kong-person.svg' }
-  return icons[key]
-}
-
-function ProjectSection({ project, countLabel, children, defaultOpen = false }: {
-  project: string
-  countLabel?: string
-  children: ReactNode
-  defaultOpen?: boolean
-}) {
-  const icon = projectIcon(project)
-  return <details className="operations-project" open={defaultOpen}>
-    <summary><span className="org-project-name">{icon && <img src={`${import.meta.env.BASE_URL}${icon}`} alt="" />}<span><strong>{project}</strong>{countLabel && <span className="org-project-headcount"><span>채용중 TO <b>{countLabel}</b></span></span>}</span></span><ChevronDown size={18} aria-hidden="true" /></summary>
-    <div className="operations-project-content">{children}</div>
-  </details>
-}
-
 function OpeningProgress({ opening }: { opening: Opening }) {
   const stageCounts = new Map<PipelineStage, number>()
   opening.candidates.filter((candidate): candidate is Candidate & { stage: PipelineStage } => candidate.stage !== 'Hired').forEach(candidate => stageCounts.set(candidate.stage, (stageCounts.get(candidate.stage) || 0) + 1))
@@ -128,7 +92,7 @@ function OpeningProgress({ opening }: { opening: Opening }) {
   </div>
 }
 
-function OpeningGroups({ openings }: { openings: Opening[] }) {
+export function ProjectOpeningProgress({ openings }: { openings: Opening[] }) {
   const groups = groupOpeningsByTo(openings)
   return groups.length ? <div className="operations-to-list">{groups.map(group => <section className="operations-to-group" key={group.key}>
     <header><span>{group.shared ? '공유 TO' : '채용 중 TO'}</span>{group.targetTo > 0 && <b>목표 {group.targetTo}명</b>}</header>
@@ -161,56 +125,6 @@ function PlannedHireList({ openings }: { openings: Opening[] }) {
   </div> : <div className="operations-empty"><CalendarDays size={23} /><b>현재 입사 예정자가 없습니다.</b></div>
 }
 
-function CompletedToList({ completedHires }: { completedHires: CompletedHire[] }) {
-  const byDate = new Map<string, CompletedHire[]>()
-  completedHires.forEach(hire => {
-    const date = offerDate(hire.hireDate)
-    byDate.set(date, [...(byDate.get(date) || []), hire])
-  })
-  const groups = [...byDate.entries()].sort(([a], [b]) => (b || '').localeCompare(a || ''))
-  return completedHires.length ? <div className="operations-completed-list">
-    <div className="operations-hires-heading"><b>입사 완료 {completedHires.length}명</b></div>
-    {groups.map(([date, hires]) => <section className="operations-completed-date-group" key={date || 'undated'}>
-      <header><strong>{date ? date.replace(/-/g, '.') : '입사날짜 미입력'}</strong><span>{hires.length}명</span></header>
-      <div className="operations-completed-table-head"><span>이름</span><span>소속</span><span>팀</span><span>Title</span><span>계약형태</span></div>
-      {hires.sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((hire, index) => <article className="operations-completed-row" key={`${hire.name}:${date}:${index}`}>
-        <div data-label="이름"><strong>{hire.name}</strong></div>
-        <div data-label="소속"><strong>{hire.organization || '—'}</strong></div>
-        <div data-label="팀"><span>{hire.team || '—'}</span></div>
-        <div data-label="Title"><strong>{hire.title || '—'}</strong></div>
-        <div data-label="계약형태"><span>{hire.employmentType || '—'}</span></div>
-      </article>)}
-    </section>)}
-  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>입사 완료자가 없습니다.</b></div>
-}
-
-export function PipelineOverview({ openings, completedHires = [], initialView = 'openings' }: { openings: Opening[]; completedHires?: CompletedHire[]; initialView?: OperationsView }) {
-  const [view, setView] = useState<OperationsView>(initialView)
-  const active = openings.filter(opening => opening.status === '진행중')
-  const byProject = sortProjectEntries([...groupOpeningsByProject(active).entries()])
-  const projectSections = byProject.map(([project, projectOpenings]) => ({ project, openings: projectOpenings, targetTo: totalTargetTo(projectOpenings) }))
-  const plannedHireCount = collectPlannedHires(openings).length
-  const activeToCount = totalTargetTo(active)
-  const monday = thisWeekMonday()
-  const mondayHireCount = completedHires.filter(hire => offerDate(hire.hireDate) === monday).length
-
-  return <section className="pipeline-overview" aria-label="프로젝트별 채용 운영">
-    <div className="operations-view-tabs" role="tablist" aria-label="채용 운영 화면 선택">
-      <button type="button" role="tab" id="operations-tab-openings" aria-selected={view === 'openings'} aria-controls="operations-panel" onClick={() => setView('openings')}>
-        <span>채용 진행 TO</span><b>{activeToCount}명</b>
-      </button>
-      <button type="button" role="tab" id="operations-tab-hires" aria-selected={view === 'hires'} aria-controls="operations-panel" onClick={() => setView('hires')}>
-        <span>입사 예정자</span><b>{plannedHireCount}명</b>
-      </button>
-      <button type="button" role="tab" id="operations-tab-completed" aria-selected={view === 'completed'} aria-controls="operations-panel" onClick={() => setView('completed')}>
-        <span>입사 완료자</span><b>이번 주 월요일 {mondayHireCount}명</b>
-      </button>
-    </div>
-    <div className={`operations-panel view-${view}`} id="operations-panel" role="tabpanel" aria-labelledby={`operations-tab-${view}`}>
-      {view === 'openings' ? projectSections.length ? <div className="operations-project-list">{projectSections.map(({ project, openings: projectOpenings, targetTo }, index) => <ProjectSection key={project} project={project} countLabel={`${targetTo}명`} defaultOpen={index === 0}>
-        <OpeningGroups openings={projectOpenings} />
-      </ProjectSection>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 진행 중인 채용 TO가 없습니다.</b></div>
-      : view === 'hires' ? <PlannedHireList openings={openings} /> : <CompletedToList completedHires={completedHires} />}
-    </div>
-  </section>
+export function PipelineOverview({ openings }: { openings: Opening[] }) {
+  return <section className="pipeline-overview" aria-label="입사 예정자 목록"><PlannedHireList openings={openings} /></section>
 }

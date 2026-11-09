@@ -9,7 +9,6 @@ type SheetPayload = {
   error?: string
   openings?: SheetOpening[]
   candidates?: SheetCandidate[]
-  completedHires?: Array<{ name?: unknown; organization?: unknown; team?: unknown; title?: unknown; employmentType?: unknown; hireDate?: unknown }>
   hiredCounts?: Record<string, unknown>
   projectTotals?: Record<string, unknown>
   projectTables?: Record<string, { totalTo?: unknown; rows?: Array<{ part?: unknown; count?: unknown; slots?: Array<{toNumber?: unknown; toNumbers?: unknown[]; person?: unknown; status?: unknown}> }> }>
@@ -110,14 +109,6 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
   groupOpeningsByTo(openings)
   return {
     openings,
-    completedHires: (payload.completedHires || []).map(source => ({
-      name: clean(source.name),
-      organization: clean(source.organization),
-      team: clean(source.team),
-      title: clean(source.title),
-      employmentType: clean(source.employmentType),
-      hireDate: clean(source.hireDate),
-    })).filter(hire => hire.name),
     candidateCount: openings.reduce((sum, opening) => sum + opening.candidates.filter(candidate => candidate.stage !== 'Hired').length, 0),
     syncedAt: payload.syncedAt || new Date().toISOString(),
     sheetApiUrl: previous?.sheetApiUrl || '',

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
-import { collectPipelineRows, collectPlannedHires, PIPELINE_GROUPS, PipelineOverview } from './PipelineOverview'
+import { collectPipelineRows, collectPlannedHires, PIPELINE_GROUPS, PipelineOverview, ProjectOpeningProgress } from './PipelineOverview'
 import { OverviewReport } from './App'
 
 describe('전형별 지원자 목록', () => {
@@ -56,53 +56,37 @@ describe('전형별 지원자 목록', () => {
     expect(collectPipelineRows(next.openings, 'offer').map(row => row.candidate.name)).toEqual(['입사일 미정자', '빠른 입사'])
   })
 
-  it('프로젝트별 채용 진행과 입사 예정자 화면을 분리해 표시한다', async () => {
+  it('입사 예정자만 상단에 표시하고 직무별 진행 정보는 프로젝트 상세에서 제공한다', async () => {
     const data = await buildLiveDashboard(structuredClone(fixture), null)
     data.openings.flatMap(opening => opening.candidates).find(candidate => candidate.stage === 'Offer')!.hireDate = ''
     const html = renderToStaticMarkup(<PipelineOverview openings={data.openings} />)
-    expect(html).toContain('id="operations-tab-openings" aria-selected="true"')
+    expect(html).toContain('aria-label="입사 예정자 목록"')
     expect(html).toContain('MAZE')
     expect(html).toContain('그래픽스 프로그래머')
     expect(html).toContain('채용 사유')
-    expect(html).toContain('진행 단계')
-    expect(html).not.toContain('테스트 D')
+    expect(html).toContain('테스트 D')
     expect(html).not.toContain('테스트 A')
-    const hireHtml = renderToStaticMarkup(<PipelineOverview openings={data.openings} initialView="hires" />)
-    expect(hireHtml).toContain('id="operations-tab-hires" aria-selected="true"')
-    expect(hireHtml).toContain('테스트 D')
-    expect(hireHtml).toContain('입사 예정 날짜')
-    expect(hireHtml).toContain('일정 미정')
+    expect(html).toContain('입사 예정 날짜')
+    const detailHtml = renderToStaticMarkup(<ProjectOpeningProgress openings={data.openings} />)
+    expect(detailHtml).toContain('진행 단계')
+    expect(detailHtml).toContain('공유 TO')
+    expect(detailHtml).not.toContain('테스트 D')
     const empty = renderToStaticMarkup(<PipelineOverview openings={[]} />)
-    expect(empty).toContain('현재 진행 중인 채용 TO가 없습니다.')
-    const emptyHires = renderToStaticMarkup(<PipelineOverview openings={[]} initialView="hires" />)
-    expect(emptyHires).toContain('현재 입사 예정자가 없습니다.')
+    expect(empty).toContain('현재 입사 예정자가 없습니다.')
   })
 
-  it('입사 완료자는 같은 입사날짜로 묶고 최근 날짜부터 표시한다', () => {
-    const html = renderToStaticMarkup(<PipelineOverview openings={[]} initialView="completed" completedHires={[
-      { name: '김가', organization: 'MAZE', team: '개발', title: '엔지니어', employmentType: '정규직', hireDate: '2026-10-26' },
-      { name: '박나', organization: 'HERO', team: '기획', title: '기획자', employmentType: '정규직', hireDate: '2026-11-02' },
-      { name: '이다', organization: 'ZERO', team: '아트', title: '아티스트', employmentType: '계약직', hireDate: '2026-11-02' },
-    ]} />)
-    expect(html.match(/class="operations-completed-date-group"/g)).toHaveLength(2)
-    expect(html.indexOf('2026.11.02')).toBeLessThan(html.indexOf('2026.10.26'))
-    expect(html.indexOf('박나')).toBeLessThan(html.indexOf('2026.10.26'))
-    expect(html.indexOf('이다')).toBeLessThan(html.indexOf('2026.10.26'))
-    expect(html.match(/2026\.11\.02/g)).toHaveLength(1)
-  })
-
-  it('상단 입사 예정자와 탭은 지난 입사일을 제외한 같은 목록을 집계한다', async () => {
+  it('상단 입사 예정자 수와 실제 목록은 같은 기준으로 집계한다', async () => {
     const data = await buildLiveDashboard(structuredClone(fixture), null)
     const offer = data.openings.flatMap(opening => opening.candidates).find(candidate => candidate.stage === 'Offer')!
     offer.offerDate = '2020-01-01'
     expect(collectPlannedHires(data.openings, '2026-11-06')).toHaveLength(0)
     let html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/입사 예정자<\/span><b>0명/)
-    expect(html).toContain('id="operations-tab-hires" aria-selected="false" aria-controls="operations-panel"><span>입사 예정자</span><b>0명')
+    expect(html).toContain('현재 입사 예정자가 없습니다.')
     offer.offerDate = '2099-01-01'
     html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/입사 예정자<\/span><b>1명/)
-    expect(html).toContain('id="operations-tab-hires" aria-selected="false" aria-controls="operations-panel"><span>입사 예정자</span><b>1명')
+    expect(html).toContain('테스트 D')
     expect(collectPlannedHires(data.openings, '2026-11-06')).toHaveLength(1)
   })
 })

@@ -4,6 +4,7 @@ import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
 import { OpeningBoard, OverviewReport } from './App'
 import { groupOpeningsByProject, groupOpeningsByTo, totalTargetTo } from './headcount'
+import { ProjectOpeningProgress } from './PipelineOverview'
 
 const payload = () => structuredClone(fixture)
 
@@ -72,17 +73,17 @@ describe('공유 TO', () => {
     expect([...groupOpeningsByProject(data.openings).keys()]).toEqual(['OTPS'])
   })
 
-  it('채용 운영 요약은 프로젝트별 TO 진행과 입사 예정자 화면으로 나눈다', async () => {
+  it('상단에는 입사 예정자만 두고 프로젝트 TO 상세에 채용 진행을 통합한다', async () => {
     const data = await buildLiveDashboard(payload(), null)
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/오픈 공고<\/span><b>2개/)
     expect(html).toMatch(/목표 TO<\/span><b>3명/)
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
     expect(html).toContain('프로젝트 TO 현황')
-    expect(html).toContain('전체 인원과 TO 자리 구성')
-    expect(html).toContain('채용 진행 TO')
-    expect(html).toContain('operations-tab-openings')
-    expect(html).toContain('operations-tab-hires')
+    expect(html).toContain('TO 구성과 채용 진행 상황을 함께 확인')
+    expect(html).toContain('입사 예정자 목록')
+    expect(html).not.toContain('operations-tab-openings')
+    expect(html).not.toContain('입사 완료자')
     expect(html).toContain('MAZE')
     expect(html).toMatch(/<span class="org-project-stat"><small>목표 TO<\/small><b>3명<\/b><\/span>/)
     expect(html).toContain('org-project-row')
@@ -90,11 +91,12 @@ describe('공유 TO', () => {
     expect(html).not.toContain('project-status-table')
     expect(html).not.toContain('개 공고 합산')
     expect(html).not.toContain('shared-to-row')
-    expect(html).toContain('공유 TO')
     expect(html).toContain('채용 직무')
     expect(html).toContain('채용 사유')
-    expect(html).toContain('진행 단계')
-    expect(html).toContain('operations-stage-chip')
+    const progressHtml = renderToStaticMarkup(<ProjectOpeningProgress openings={data.openings} />)
+    expect(progressHtml).toContain('공유 TO')
+    expect(progressHtml).toContain('진행 단계')
+    expect(progressHtml).toContain('operations-stage-chip')
     expect(html).not.toContain('org-stage-bar')
     const differing = structuredClone(data)
     differing.openings[0].reason = '별도 세부 사유'

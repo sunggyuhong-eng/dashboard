@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowLeft, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Eye, EyeOff, FileText, LockKeyhole, LogOut, RefreshCw, Settings2, Target, UsersRound, X } from 'lucide-react'
 import { api } from './api'
 import { ApprovalLink } from './ApprovalLink'
-import { collectPlannedHires, PipelineOverview } from './PipelineOverview'
+import { collectPlannedHires, PipelineOverview, ProjectOpeningProgress } from './PipelineOverview'
 import { RecruitingReport } from './RecruitingReport'
 import { groupOpeningsByProject, groupOpeningsByTo, projectName, totalTargetTo } from './headcount'
 import { PIPELINE_STAGES, type DashboardData, type Opening, type PipelineStage, type ProjectTableSlot } from './types'
@@ -292,8 +292,8 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
 
   return <section className="report-view"><div className="report-head"><div><span className="eyebrow">RECRUITING STATUS REPORT</span><h1>전체 채용 현황</h1></div><div className="report-actions"><div className="as-of"><FileText size={16} /><span>기준 시각<b>{data.syncedAt ? new Date(data.syncedAt).toLocaleString('ko-KR') : '-'}</b></span></div><button className="primary generate-report" onClick={openReport}><FileText size={16} /> 리포트 생성하기</button></div></div>
     <div className="report-kpis"><Summary label="목표 TO" value={targetTo ? `${targetTo}명` : '미입력'} /><Summary label="진행 지원자" value={`${candidates.length}명`} /><Summary label="입사 예정자" value={`${plannedHireCount}명`} /><Summary label="오픈 공고" value={`${active.length}개`} /></div>
-    <section className="recruiting-operations"><header><div><h2>채용 진행 TO</h2><p className="section-description">프로젝트별 채용 직무와 진행 단계를 확인하세요.</p></div></header><PipelineOverview openings={data.openings} completedHires={data.completedHires} /></section>
-    <article className="project-overview"><header><div><h2>프로젝트 TO 현황</h2><p>전체 인원과 TO 자리 구성을 확인하세요.</p></div></header>
+    <section className="recruiting-operations"><header><div><h2>입사 예정자</h2><p className="section-description">예정일과 채용 직무를 확인하세요.</p></div></header><PipelineOverview openings={data.openings} /></section>
+    <article className="project-overview"><header><div><h2>프로젝트 TO 현황</h2><p>프로젝트를 펼쳐 TO 구성과 채용 진행 상황을 함께 확인하세요.</p></div></header>
       <div className="org-project-list">{orderedProjects.map(([project, projectOpenings]) => {
         const activeOpenings = projectOpenings.filter(opening => opening.status === '진행중')
         const activeProjectTarget = totalTargetTo(activeOpenings)
@@ -315,6 +315,7 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
           </button>
           {selectedProject === project && <section className="org-project-detail"><header><div><span>PROJECT DETAIL</span><h3>{selectedProject}</h3></div><button type="button" className="outline" onClick={() => setSelectedProject(null)}>닫기 <X size={14} /></button></header>
             {projectTable && <section className="maze-to-overview"><header><div><span>{projectSheetName} HEADCOUNT</span><h4>TO 현황</h4></div><div className="maze-to-metrics"><span><small>전체 TO</small><b>{projectTable.totalTo}명</b></span><span><small>채용중 TO</small><b>{activeProjectTarget}명</b></span></div></header><h5>{projectSheetName} 파트별 현황</h5><div className="maze-to-table-scroll"><table aria-label={`${projectKey} TO 현황`}><thead><tr><th scope="col">파트</th><th scope="col">인원</th><th scope="col">구성원 · TO 상태</th></tr></thead><tbody>{projectTable.rows.map((row, rowIndex) => { const displaySlots = displayProjectSlots(row.slots); return <tr key={`${row.part}-${rowIndex}`}><th scope="row">{row.part}</th><td>{row.count}명</td><td>{displaySlots.length ? <div className="maze-member-list">{displaySlots.map((slot, slotIndex) => slot.person?.includes('입사예정') ? <span className="maze-planned-hire" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('대체채용 진행중') ? <span className="maze-planned-replacement" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('퇴사예정') ? <span className="maze-planned-departure" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : slot.person?.includes('휴직') ? <span className="maze-member maze-member-leave" key={`${slot.toNumber}-${slotIndex}`}>{slot.person}</span> : (slot.toNumber || slot.toNumbers?.length) ? <span className={`maze-to-status ${slot.status === '완료' ? 'done' : ''}`} key={`${slot.toNumber ?? slot.toNumbers?.join('&')}-${slotIndex}`}>{slot.status === '완료' ? '완료' : '채용중'}</span> : slot.person ? <span className="maze-member" key={slotIndex}>{slot.person}</span> : null)}</div> : <span className="maze-member-empty">—</span>}</td></tr> })}</tbody></table></div></section>}
+            {activeOpenings.length > 0 && <section className="org-recruiting-detail"><header><h4>진행 중인 채용</h4><span>채용중 TO {activeProjectTarget}명</span></header><ProjectOpeningProgress openings={activeOpenings} /></section>}
           </section>}
         </div>
       })}</div>

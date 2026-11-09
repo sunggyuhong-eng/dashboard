@@ -211,7 +211,7 @@ function openingTable_(sheet) {
     toGroup: ['TO 그룹', 'TO그룹', '공유 TO 그룹', '공유TO그룹'],
     reason: ['채용사유', '채용 사유', '채용배경', '채용 배경'],
     completedName: ['채용완료', '입사완료', '입사자', '입사완료자'],
-    completedDate: ['입사날짜', '입사 날짜', '입사일', '입사완료일'],
+    completedDate: ['공고마감', '공고 마감', '공고마감일', '공고 마감 날짜', '입사날짜', '입사 날짜', '입사일', '입사완료일'],
     approvalUrl: ['채용승인신청서 링크', '채용 승인 신청서 링크', '채용승인신청서', '채용 승인 신청서']
   };
   for (var r = 0; r < Math.min(values.length, 40); r++) {

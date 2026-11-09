@@ -283,7 +283,11 @@ export function OverviewReport({ data, onSelectOpening }: { data: DashboardData;
   const notes = new Map(active.map(opening => [opening.id, loadNote(opening)]))
   const allProjects = groupOpeningsByProject(data.openings)
   const projectOrder = ['ART실', 'GDTS', 'OTPS', 'MAZE', 'HERO', 'ZERO', 'QA', 'SERVER', 'KONG']
-  const orderedProjects = [...allProjects.entries()].sort(([a], [b]) => {
+  const orderedProjects = [...allProjects.entries()].filter(([project, openings]) => {
+    const key = project.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR').replace(/\s+/g, '')
+    return !['QA', 'INFRA', 'ITINFRA', 'SERVER', 'KONG'].includes(key)
+      || totalTargetTo(openings.filter(opening => opening.status === '진행중')) > 0
+  }).sort(([a], [b]) => {
     const key = (value: string) => value.trim().replace(/^Project\s+/i, '').toLocaleUpperCase('ko-KR')
     const ai = projectOrder.indexOf(key(a))
     const bi = projectOrder.indexOf(key(b))

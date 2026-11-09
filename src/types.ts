@@ -58,6 +58,15 @@ export type ProjectTable = {
   rows: ProjectTableRow[]
 }
 
+export type WeeklySnapshot = {
+  week: string
+  project: string
+  activeTo: number
+  candidates: number
+  completed: number
+  capturedAt: string
+}
+
 export type DashboardData = {
   openings: Opening[]
   syncedAt: string
@@ -65,4 +74,6 @@ export type DashboardData = {
   sheetApiUrl?: string
   projectTotals?: Record<string, number>
   projectTables?: Record<string, ProjectTable>
+  weeklySnapshots?: WeeklySnapshot[]
+  weeklySnapshotError?: string
 }

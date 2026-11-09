@@ -1,14 +1,13 @@
-import { CalendarDays, UsersRound } from 'lucide-react'
-import { groupOpeningsByTo, projectName } from './headcount'
+import { UsersRound } from 'lucide-react'
+import { groupOpeningsByTo, projectName, toProgressAnchor } from './headcount'
 import { offerDate } from './OfferOverview'
 import type { Candidate, Opening, PipelineStage } from './types'
 
 export const PIPELINE_GROUPS = [
-  { id: 'task', label: '온라인 과제', stages: ['온라인 과제'] },
-  { id: 'coding', label: '코딩 테스트', stages: ['코딩테스트'] },
-  { id: 'interview', label: '면접', stages: ['면접', '1차 면접', '2차 면접', '면접합격'] },
-  { id: 'salary', label: '처우 협의', stages: ['처우단계'] },
-  { id: 'offer', label: '오퍼', stages: ['Offer'] },
+  { id: 'assessment', label: '온라인 과제 · 코딩 테스트', stages: ['온라인 과제', '코딩테스트', '역량검사'] },
+  { id: 'interview', label: '면접 · 1차 · 2차', stages: ['면접', '1차 면접', '2차 면접'] },
+  { id: 'decision', label: '면접 합격 · 처우 협의', stages: ['면접합격', '처우단계'] },
+  { id: 'offer', label: '입사 예정 · Offer', stages: ['Offer'] },
 ] as const
 
 export type PipelineGroupId = typeof PIPELINE_GROUPS[number]['id']
@@ -23,12 +22,14 @@ export type PipelineRow = {
 }
 
 function todayDateString(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(date).map(part => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}`
 }
 
 export function collectPlannedHires(openings: Opening[], today = todayDateString()) {
   return openings.flatMap(opening => opening.candidates.flatMap(candidate => {
-    const date = offerDate(candidate.offerDate)
+    const date = offerDate(candidate.offerDate || candidate.hireDate)
     if (opening.status !== '진행중' || candidate.stage !== 'Offer' || (date && date <= today)) return []
     return [{ opening, candidate, date }]
   })).sort((a, b) => (a.date || '9999-12-31').localeCompare(b.date || '9999-12-31')
@@ -43,7 +44,7 @@ const stageLabel: Record<PipelineStage, string> = {
 }
 
 function candidateDates(candidate: Candidate): PipelineRow['dates'] {
-  const pairs = candidate.stage === 'Offer' ? [['입사 예정', candidate.hireDate]]
+  const pairs = candidate.stage === 'Offer' ? [['입사 예정', candidate.offerDate || candidate.hireDate]]
     : candidate.stage === '1차 면접' ? [['1차 면접', candidate.firstInterviewDate]]
     : candidate.stage === '2차 면접' ? [['2차 면접', candidate.secondInterviewDate]]
     : candidate.stage === '면접' ? [['1차 면접', candidate.firstInterviewDate], ['2차 면접', candidate.secondInterviewDate]]
@@ -94,7 +95,7 @@ function OpeningProgress({ opening }: { opening: Opening }) {
 
 export function ProjectOpeningProgress({ openings }: { openings: Opening[] }) {
   const groups = groupOpeningsByTo(openings)
-  return groups.length ? <div className="operations-to-list">{groups.map(group => <section className="operations-to-group" key={group.key}>
+  return groups.length ? <div className="operations-to-list">{groups.map(group => <section className="operations-to-group" id={toProgressAnchor(group)} key={group.key}>
     <header><span>{group.shared ? '공유 TO' : '채용 중 TO'}</span>{group.targetTo > 0 && <b>목표 {group.targetTo}명</b>}</header>
     {group.openings.map(opening => <article className="operations-opening" key={opening.id}>
       <div className="operations-opening-main">
@@ -110,21 +111,18 @@ export function ProjectOpeningProgress({ openings }: { openings: Opening[] }) {
   </section>)}</div> : <div className="operations-empty"><UsersRound size={23} /><b>현재 채용 중인 TO가 없습니다.</b></div>
 }
 
-function PlannedHireList({ openings }: { openings: Opening[] }) {
-  const rows = collectPlannedHires(openings)
-  return rows.length ? <div className="operations-hires-list">
-    <div className="operations-hires-heading"><b>입사 예정 {rows.length}명</b></div>
-    <div className="operations-hire-table-head"><span>프로젝트</span><span>입사자</span><span>채용 직무</span><span>채용 사유</span><span>입사 예정 날짜</span></div>
-    {rows.map(({ opening, candidate, date }) => <article className="operations-hire-row" key={`${opening.id}:${candidate.id}`}>
-      <div data-label="프로젝트"><strong>{projectName(opening)}</strong></div>
-      <div data-label="입사자"><strong>{candidate.name || '이름 미입력'}</strong></div>
-      <div data-label="채용 직무"><strong>{roleName(opening)}</strong></div>
-      <div data-label="채용 사유"><span>{opening.reason || '채용 사유 미입력'}</span></div>
-      <div className="operations-hire-date" data-label="입사 예정 날짜"><strong>{date ? date.replace(/-/g, '.') : '일정 미정'}</strong></div>
-    </article>)}
-  </div> : <div className="operations-empty"><CalendarDays size={23} /><b>현재 입사 예정자가 없습니다.</b></div>
-}
-
 export function PipelineOverview({ openings }: { openings: Opening[] }) {
-  return <section className="pipeline-overview" aria-label="입사 예정자 목록"><PlannedHireList openings={openings} /></section>
+  return <section className="pipeline-overview grouped-pipeline" aria-label="진행 단계별 지원자 목록">
+    {PIPELINE_GROUPS.map(group => {
+      const rows = collectPipelineRows(openings, group.id).filter(row => group.id !== 'offer' || !offerDate(row.candidate.offerDate || row.candidate.hireDate) || offerDate(row.candidate.offerDate || row.candidate.hireDate) > todayDateString())
+      return <article className="pipeline-group-card" key={group.id}>
+        <header><h3>{group.label}</h3><b>{rows.length}명</b></header>
+        <div className="pipeline-group-rows">{rows.length ? rows.map(row => <div className="pipeline-person-row" key={row.key}>
+          <div><strong>{row.candidate.name || '이름 미입력'}</strong><span className="pipeline-person-stage">{stageLabel[row.candidate.stage as PipelineStage]}</span></div>
+          <p><b>{row.project}</b><span>{row.title}</span></p>
+          {group.id === 'offer' && <small>입사 예정 날짜 <b>{row.dates[0]?.value?.replace(/-/g, '.') || '일정 미정'}</b></small>}
+        </div>) : <p className="pipeline-group-empty">현재 해당 단계의 지원자가 없습니다.</p>}</div>
+      </article>
+    })}
+  </section>
 }

@@ -125,6 +125,8 @@ def build_dashboard(sheet_data: dict, previous_opening_ids: set[str] | None = No
         "openings": openings,
         "candidateCount": sum(len(opening["candidates"]) for opening in openings),
         "syncedAt": datetime.now(timezone.utc).isoformat(),
+        "weeklySnapshots": sheet_data.get("weeklySnapshots") if isinstance(sheet_data.get("weeklySnapshots"), list) else [],
+        "weeklySnapshotError": str(sheet_data.get("weeklySnapshotError") or ""),
     }
     unmatched = sum(len(items) for key, items in candidates_by_opening.items() if key not in current_keys)
     return dashboard, unmatched

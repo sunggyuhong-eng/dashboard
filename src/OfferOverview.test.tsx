@@ -68,7 +68,7 @@ describe('오퍼 · 입사 예정', () => {
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/목표 TO<\/span><b>3명/)
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
-    expect(html).toContain('aria-label="입사 예정자 목록"')
+    expect(html).toContain('aria-label="진행 단계별 지원자 목록"')
     expect(html).toContain('프로젝트 TO 현황')
     expect(html).toContain('입사 예정자')
     expect(html).toContain('org-project-row')

@@ -1,4 +1,4 @@
-import { type Candidate, type CandidateStage, type DashboardData, type Opening, type ProjectTable } from './types'
+import { type Candidate, type CandidateStage, type DashboardData, type Opening, type ProjectTable, type WeeklySnapshot } from './types'
 import { approvalLink } from './links'
 import { groupOpeningsByTo } from './headcount'
 
@@ -13,6 +13,8 @@ type SheetPayload = {
   projectTotals?: Record<string, unknown>
   projectTables?: Record<string, { totalTo?: unknown; rows?: Array<{ part?: unknown; count?: unknown; slots?: Array<{toNumber?: unknown; toNumbers?: unknown[]; person?: unknown; status?: unknown}> }> }>
   syncedAt?: string
+  weeklySnapshots?: Array<Record<string, unknown>>
+  weeklySnapshotError?: unknown
 }
 
 const clean = (value: unknown) => String(value ?? '').trim()
@@ -134,6 +136,11 @@ export async function buildLiveDashboard(payload: SheetPayload, previous: Dashbo
         })).filter(row => row.part),
       },
     ])),
+    weeklySnapshots: (Array.isArray(payload.weeklySnapshots) ? payload.weeklySnapshots : previous?.weeklySnapshots || []).filter(row => row && /^\d{4}-\d{2}-\d{2}$/.test(clean(row.week)) && clean(row.project)).map((row): WeeklySnapshot => ({
+      week: clean(row.week), project: clean(row.project), activeTo: Math.max(0, Number(row.activeTo) || 0),
+      candidates: Math.max(0, Number(row.candidates) || 0), completed: Math.max(0, Number(row.completed) || 0), capturedAt: clean(row.capturedAt),
+    })),
+    weeklySnapshotError: clean(payload.weeklySnapshotError),
   }
 }
 

@@ -1,7 +1,6 @@
 var ACTIVE_STAGES = ['온라인 과제','코딩테스트','역량검사','면접','1차 면접','2차 면접','면접합격','처우단계','Offer'];
 
-// GitHub Pages의 '데이터 다시 불러오기' 전용 읽기 API입니다.
-// JSONP 콜백만 허용하며 시트에는 어떤 값도 쓰지 않습니다.
+// 브라우저 조회는 읽기 전용입니다. 인증된 정기 POST 동기화가 월요일 기록을 저장합니다.
 function doGet(e) {
   try {
     var callback = clean_(e && e.parameter && e.parameter.callback);
@@ -28,7 +27,16 @@ function doPost(e) {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     var expected = PropertiesService.getScriptProperties().getProperty('API_TOKEN');
     if (!expected || body.token !== expected) return output_({ ok: false, error: '인증 토큰이 올바르지 않습니다.' });
-    if (body.action === 'dashboard') return output_(dashboard_());
+    if (body.action === 'dashboard') {
+      var data = dashboard_();
+      try {
+        saveMondaySnapshot_(SpreadsheetApp.getActiveSpreadsheet(), data);
+        data.weeklySnapshots = readWeeklySnapshots_(SpreadsheetApp.getActiveSpreadsheet());
+      } catch (snapshotError) {
+        data.weeklySnapshotError = String(snapshotError && snapshotError.message ? snapshotError.message : snapshotError);
+      }
+      return output_(data);
+    }
     return output_({ ok: false, error: '허용되지 않은 요청입니다.' });
   } catch (error) {
     return output_({ ok: false, error: String(error && error.message ? error.message : error) });
@@ -52,6 +60,7 @@ function dashboard_() {
       .map(function(name) { return findSheet_(ss, [name]); })
       .filter(function(sheet) { return !!sheet; });
   projectSheets.forEach(function(projectSheet) {
+    if (projectSheet.getName() === 'TO_History') return;
     var match = projectSheet.getName().match(/^TO_(.+)$/i);
     if (!match) return;
     var projectKey = clean_(match[1]).toLocaleUpperCase();
@@ -144,6 +153,7 @@ function dashboard_() {
     hiredCounts: hiredCounts,
     projectTotals: projectTotals,
     projectTables: projectTables,
+    weeklySnapshots: readWeeklySnapshots_(ss),
     syncedAt: new Date().toISOString()
   };
 }
@@ -386,6 +396,89 @@ function projectToKey_(project) {
   if (value === '아트실') return 'ART실';
   if (value === 'OCTOPUS') return 'OTPS';
   return value;
+}
+
+var WEEKLY_HEADERS = ['기준 월요일', '프로젝트', '채용중 TO', '진행 지원자', '주간 채용 완료', '기록 시각'];
+
+function readWeeklySnapshots_(ss) {
+  var sheet = ss.getSheetByName('TO_History');
+  if (!sheet) return [];
+  return sheet.getDataRange().getDisplayValues().slice(1).filter(function(row) {
+    return !!dashboardDateText_(row[0]) && clean_(row[1]);
+  }).map(function(row) {
+    return { week: dashboardDateText_(row[0]), project: clean_(row[1]), activeTo: number_(row[2]), candidates: number_(row[3]), completed: number_(row[4]), capturedAt: clean_(row[5]) };
+  });
+}
+
+function weeklyMetrics_(data, monday, timezone) {
+  var parts = monday.split('-').map(Number);
+  var previous = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] - 7, 12));
+  var previousMonday = Utilities.formatDate(previous, timezone, 'yyyy-MM-dd');
+  var projects = {};
+  var candidateCounts = {};
+  (data.candidates || []).forEach(function(candidate) {
+    if (ACTIVE_STAGES.indexOf(candidate.stage) < 0) return;
+    var key = key_(candidate.project, candidate.openingTitle);
+    candidateCounts[key] = (candidateCounts[key] || 0) + 1;
+  });
+  var completedPeople = {};
+  (data.openings || []).forEach(function(opening) {
+    var project = projectToKey_(opening.project);
+    var item = projects[project] || { project: project, activeTo: 0, candidates: 0, completed: 0, groups: {} };
+    if (opening.status === '진행중') {
+      var groupKey = clean_(opening.toGroup) ? 'group:' + clean_(opening.toGroup).toLowerCase() : 'row:' + opening.row;
+      item.groups[groupKey] = Math.max(item.groups[groupKey] || 0, number_(opening.targetTo));
+      item.candidates += candidateCounts[key_(opening.project, opening.title)] || 0;
+    }
+    var name = clean_(opening.completedName), date = clean_(opening.completedDate);
+    if (opening.status === '완료' && name && date > previousMonday && date <= monday) {
+      var personKey = project + '\u001f' + name + '\u001f' + date;
+      if (!completedPeople[personKey]) { item.completed++; completedPeople[personKey] = true; }
+    }
+    projects[project] = item;
+  });
+  var rows = Object.keys(projects).sort().map(function(key) {
+    var item = projects[key];
+    item.activeTo = Object.keys(item.groups).reduce(function(sum, group) { return sum + item.groups[group]; }, 0);
+    return { project: item.project, activeTo: item.activeTo, candidates: item.candidates, completed: item.completed };
+  });
+  var total = rows.reduce(function(all, row) {
+    all.activeTo += row.activeTo; all.candidates += row.candidates; all.completed += row.completed;
+    return all;
+  }, { project: '전체', activeTo: 0, candidates: 0, completed: 0 });
+  return [total].concat(rows);
+}
+
+function saveMondaySnapshot_(ss, data, now) {
+  now = now || new Date();
+  var timezone = ss.getSpreadsheetTimeZone();
+  var today = Utilities.formatDate(now, timezone, 'yyyy-MM-dd');
+  var monday = mondayOfCurrentWeek_(now, timezone);
+  if (today !== monday) return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) throw new Error('월요일 기록 잠금을 얻지 못했습니다. 다음 동기화에서 다시 시도합니다.');
+  try {
+    var sheet = ss.getSheetByName('TO_History') || ss.insertSheet('TO_History');
+    if (sheet.getLastRow() === 0) sheet.appendRow(WEEKLY_HEADERS);
+    var existing = {};
+    sheet.getDataRange().getDisplayValues().forEach(function(row, index) {
+      if (index && dashboardDateText_(row[0]) === monday) existing[clean_(row[1])] = index + 1;
+    });
+    var rows = weeklyMetrics_(data, monday, timezone);
+    var stamp = Utilities.formatDate(now, timezone, 'yyyy-MM-dd HH:mm:ss');
+    rows.forEach(function(row) {
+      var values = [monday, row.project, row.activeTo, row.candidates, row.completed, stamp];
+      if (existing[row.project]) sheet.getRange(existing[row.project], 1, 1, WEEKLY_HEADERS.length).setValues([values]);
+      else sheet.appendRow(values);
+    });
+    Object.keys(existing).forEach(function(project) {
+      if (!rows.some(function(row) { return row.project === project; })) {
+        sheet.getRange(existing[project], 1, 1, WEEKLY_HEADERS.length).setValues([[monday, project, 0, 0, 0, stamp]]);
+      }
+    });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function output_(value) {

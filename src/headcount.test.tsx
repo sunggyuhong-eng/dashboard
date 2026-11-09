@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
-import { OpeningBoard, OverviewReport } from './App'
-import { groupOpeningsByProject, groupOpeningsByTo, totalTargetTo } from './headcount'
+import { OpeningBoard, OverviewReport, ProjectToSlot } from './App'
+import { activeToTargets, groupOpeningsByProject, groupOpeningsByTo, targetForProjectSlot, totalTargetTo } from './headcount'
 import { ProjectOpeningProgress } from './PipelineOverview'
 
 const payload = () => structuredClone(fixture)
@@ -73,7 +73,7 @@ describe('공유 TO', () => {
     expect([...groupOpeningsByProject(data.openings).keys()]).toEqual(['OTPS'])
   })
 
-  it('상단에는 입사 예정자만 두고 프로젝트 TO 상세에 채용 진행을 통합한다', async () => {
+  it('상단에는 단계별 지원자를 묶고 프로젝트 TO 상세에 채용 진행을 통합한다', async () => {
     const data = await buildLiveDashboard(payload(), null)
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).toMatch(/오픈 공고<\/span><b>2개/)
@@ -81,7 +81,7 @@ describe('공유 TO', () => {
     expect(html).toMatch(/진행 지원자<\/span><b>4명/)
     expect(html).toContain('프로젝트 TO 현황')
     expect(html).toContain('TO 구성과 채용 진행 상황을 함께 확인')
-    expect(html).toContain('입사 예정자 목록')
+    expect(html).toContain('진행 단계별 지원자 목록')
     expect(html).not.toContain('operations-tab-openings')
     expect(html).not.toContain('입사 완료자')
     expect(html).toContain('MAZE')
@@ -92,9 +92,9 @@ describe('공유 TO', () => {
     expect(html).not.toContain('개 공고 합산')
     expect(html).not.toContain('shared-to-row')
     expect(html).toContain('채용 직무')
-    expect(html).toContain('채용 사유')
     const progressHtml = renderToStaticMarkup(<ProjectOpeningProgress openings={data.openings} />)
     expect(progressHtml).toContain('공유 TO')
+    expect(progressHtml).toContain('채용 사유')
     expect(progressHtml).toContain('진행 단계')
     expect(progressHtml).toContain('operations-stage-chip')
     expect(html).not.toContain('org-stage-bar')
@@ -131,5 +131,24 @@ describe('공유 TO', () => {
     const html = renderToStaticMarkup(<OverviewReport data={data} />)
     expect(html).not.toContain('2개 공고 합산')
     expect(html).not.toContain('지원자 추이')
+  })
+
+  it('TO 표의 대체채용 표시와 공유 번호를 해당 진행 중 채용 카드에 연결한다', async () => {
+    const raw = payload()
+    raw.openings = raw.openings.map((opening, index) => ({ ...opening, project: 'Art실', toGroup: 'Art-1', toNumber: index === 0 ? 4 : 5 }))
+    const openings = (await buildLiveDashboard(raw, null)).openings
+    const targets = activeToTargets(openings)
+    const direct = targetForProjectSlot({ toNumber: 4, person: '테스트(대체채용 진행중)' }, targets)
+    expect(direct).toBeTruthy()
+    expect(targetForProjectSlot({ toNumbers: [4, 5] }, targets)).toBe(direct)
+    expect(renderToStaticMarkup(<ProjectOpeningProgress openings={openings} />)).toContain(`id="${direct}"`)
+    const link = renderToStaticMarkup(<ProjectToSlot slot={{ toNumber: 4, person: '테스트(대체채용 진행중)' }} target={direct} />)
+    expect(link).toContain(`href="#${direct}"`)
+    expect(link).toContain('연결된 진행 중 채용으로 이동')
+    expect(targetForProjectSlot({ toNumber: 99 }, targets)).toBeNull()
+    openings[1].status = '완료'
+    expect(targetForProjectSlot({ toNumbers: [4, 5] }, activeToTargets(openings))).toBe(direct)
+    openings[0].status = '완료'
+    expect(targetForProjectSlot({ toNumber: 4 }, activeToTargets(openings))).toBeNull()
   })
 })

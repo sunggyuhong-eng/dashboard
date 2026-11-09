@@ -160,3 +160,9 @@ def test_dashboard_exports_completed_person_date_and_to_number():
     dashboard, _ = build_dashboard(data)
     opening = dashboard["openings"][0]
     assert (opening["toNumber"], opening["completedName"], opening["completedDate"]) == (15, "테스트 입사자", "2026-11-09")
+
+
+def test_dashboard_preserves_monday_snapshots_for_static_deployment():
+    weekly = [{"week": "2026-11-09", "project": "전체", "activeTo": 24, "candidates": 31, "completed": 1, "capturedAt": "2026-11-09 10:00:00"}]
+    dashboard, _ = build_dashboard({"openings": [{"project": "MAZE", "title": "전투 기획자", "targetTo": 1}], "candidates": [], "weeklySnapshots": weekly})
+    assert dashboard["weeklySnapshots"] == weekly

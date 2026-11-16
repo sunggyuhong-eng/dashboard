@@ -55,7 +55,7 @@ function roleName(opening: Opening, project: string) {
     .trim() || opening.title
 }
 
-function displayProjectSlots(slots: ProjectTableSlot[]) {
+export function displayProjectSlots(slots: ProjectTableSlot[]) {
   const merged: ProjectTableSlot[] = []
   for (let index = 0; index < slots.length; index++) {
     const slot = slots[index]
@@ -73,14 +73,19 @@ function displayProjectSlots(slots: ProjectTableSlot[]) {
 export function ProjectToSlot({ slot, target }: { slot: ProjectTableSlot; target: string | null }) {
   const person = slot.person || ''
   const hasTo = !!slot.toNumber || !!slot.toNumbers?.length
-  const className = person.includes('입사예정') ? 'maze-planned-hire'
+  // TO 시트의 수기 표기가 입사예정으로 남아 있어도 G열 완료가 최신 상태입니다.
+  const hiredPerson = hasTo && slot.status === '완료' && /\(입사예정\)/.test(person)
+    ? person.replace(/\s*\(입사예정\)/, '').trim() : ''
+  const className = hiredPerson ? 'maze-member'
+    : person.includes('입사예정') ? 'maze-planned-hire'
     : person.includes('대체채용 진행중') ? 'maze-planned-replacement'
     : person.includes('퇴사예정') ? 'maze-planned-departure'
     : person.includes('휴직') ? 'maze-member maze-member-leave'
     : hasTo ? `maze-to-status ${slot.status === '완료' ? 'done' : ''}`
     : 'maze-member'
-  const label = /입사예정|대체채용 진행중|퇴사예정|휴직/.test(person)
+  const label = hiredPerson || (/입사예정|대체채용 진행중|퇴사예정|휴직/.test(person)
     ? person : hasTo ? slot.status === '완료' ? '완료' : '채용중' : person
+  )
   if (!label) return null
   return target
     ? <a className={`${className} maze-to-jump`} href={`#${target}`} aria-label={`${label}, 연결된 진행 중 채용으로 이동`}>{label}</a>

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import fixture from '../tests/fixtures/shared_to.json'
 import { buildLiveDashboard } from './api'
-import { collectCompletedToRows, collectPreviousMondayCompletedToRows, previousMondayInSeoul, CompletedToOverview } from './CompletedToOverview'
-import { OverviewReport } from './App'
+import { collectCompletedToRows, collectRecentMondayCompletedToRows, currentMondayInSeoul, previousMondayInSeoul, CompletedToOverview } from './CompletedToOverview'
+import { displayProjectSlots, OverviewReport, ProjectToSlot } from './App'
 
 describe('Dashboard_TO 채용 완료 기록', () => {
   const novemberNinth = new Date('2026-11-09T02:00:00Z')
@@ -44,7 +44,7 @@ describe('Dashboard_TO 채용 완료 기록', () => {
     raw.openings[1] = { ...raw.openings[1], status: '마감', toNumber: 7 }
     const data = await buildLiveDashboard(raw, null)
     const html = renderToStaticMarkup(<CompletedToOverview openings={data.openings} now={novemberNinth} />)
-    expect(html).toContain('2026.11.02에 완료된 채용이 없습니다.')
+    expect(html).toContain('최근 두 월요일에 완료된 채용이 없습니다.')
     expect(html).not.toContain('TO 번호')
   })
 
@@ -64,7 +64,7 @@ describe('Dashboard_TO 채용 완료 기록', () => {
     expect(active).toContain('QA')
   })
 
-  it('매주 서울 월요일 기준 직전 월요일 완료자만 중복 없이 표시하고 새로고침 데이터 변경을 반영한다', async () => {
+  it('매주 서울 시간 기준 이번·직전 월요일 완료자만 표시하고 새로고침 데이터 변경을 반영한다', async () => {
     const raw = structuredClone(fixture)
     raw.openings = ['A', 'B', 'C', '진행중', '이번주', '이전주', '이름없음'].map((name, index) => ({
       ...raw.openings[0], title: `직무 ${index}`, toGroup: '', status: name === '진행중' ? '진행중' : '완료',
@@ -73,12 +73,37 @@ describe('Dashboard_TO 채용 완료 기록', () => {
     }))
     const data = await buildLiveDashboard(raw, null)
     expect(previousMondayInSeoul(novemberNinth)).toBe('2026-11-02')
-    expect(collectPreviousMondayCompletedToRows(data.openings, novemberNinth).map(row => row.name)).toEqual(['A', 'B', 'C'])
-    expect(renderToStaticMarkup(<CompletedToOverview openings={data.openings} now={novemberNinth} />)).toContain('<b>3명</b>')
+    expect(currentMondayInSeoul(novemberNinth)).toBe('2026-11-09')
+    expect(collectRecentMondayCompletedToRows(data.openings, novemberNinth).map(row => row.name)).toEqual(['이번주', 'A', 'B', 'C'])
+    expect(renderToStaticMarkup(<CompletedToOverview openings={data.openings} now={novemberNinth} />)).toContain('<b>4명</b>')
     data.openings[0].status = '진행중'
-    expect(collectPreviousMondayCompletedToRows(data.openings, novemberNinth)).toHaveLength(2)
+    expect(collectRecentMondayCompletedToRows(data.openings, novemberNinth)).toHaveLength(3)
     const nextMonday = new Date('2026-11-16T02:00:00Z')
     expect(previousMondayInSeoul(nextMonday)).toBe('2026-11-09')
-    expect(collectPreviousMondayCompletedToRows(data.openings, nextMonday).map(row => row.name)).toEqual(['이번주'])
+    expect(collectRecentMondayCompletedToRows(data.openings, nextMonday).map(row => row.name)).toEqual(['이번주'])
+  })
+
+  it('오늘 Hired로 입사한 사람은 완료 목록에 나타나며 TO 표의 오래된 입사예정 표시를 이름으로 바꾼다', async () => {
+    const raw = structuredClone(fixture)
+    raw.openings = ['김동주', '이학준', '이승훈'].map((name, index) => ({
+      ...raw.openings[0], title: `완료 직무 ${index}`, project: index === 1 ? 'Art실' : 'MAZE',
+      toGroup: '', toNumber: index + 11, status: '완료', completedName: name, completedDate: '2026-11-16',
+    }))
+    raw.candidates = raw.openings.map((opening, index) => ({
+      id: `hired-${index}`, row: index + 2, name: opening.completedName, stage: 'Hired',
+      project: opening.project, openingTitle: opening.title, hireDate: '2026-11-16', offerDate: '2026-11-16',
+    }))
+    const data = await buildLiveDashboard(raw, null)
+    const today = new Date('2026-11-16T02:00:00Z')
+    expect(data.openings.every(opening => opening.candidates[0]?.stage === 'Hired')).toBe(true)
+    const html = renderToStaticMarkup(<CompletedToOverview openings={data.openings} now={today} />)
+    expect(html).toContain('<b>3명</b>')
+    for (const name of ['김동주', '이학준', '이승훈']) expect(html).toContain(name)
+    const [merged] = displayProjectSlots([{ toNumber: 11, status: '완료' }, { person: '김동주(입사예정)' }])
+    expect(merged).toMatchObject({ toNumber: 11, person: '김동주(입사예정)', status: '완료' })
+    const slot = renderToStaticMarkup(<ProjectToSlot slot={merged} target={null} />)
+    expect(slot).toContain('class="maze-member"')
+    expect(slot).toContain('>김동주</span>')
+    expect(slot).not.toContain('입사예정')
   })
 })
